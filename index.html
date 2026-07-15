@@ -428,6 +428,7 @@ async function gistApi(path, method='GET', body){
       ...(body ? {'Content-Type':'application/json'} : {})
     },
     body: body ? JSON.stringify(body) : undefined,
+    keepalive: method==='PATCH', // cho phép gửi nốt khi vừa đóng app trên điện thoại
     signal: AbortSignal.timeout(20000)
   });
   if(!r.ok) throw new Error('GitHub HTTP '+r.status);
@@ -912,12 +913,19 @@ selectSource('cash');
 if(window.BINANCE_DATA && BINANCE_DATA.updated && BINANCE_DATA.updated !== S.lastBnFile){
   S.qty.usdt = BINANCE_DATA.usdt;
   S.qty.usdc = BINANCE_DATA.usdc;
+  if(typeof BINANCE_DATA.voo === 'number') S.qty.voo = BINANCE_DATA.voo;
   S.lastBnFile = BINANCE_DATA.updated;
   save();
 }
 render();
 // Kéo dữ liệu mới nhất từ đám mây khi mở app
 if(S.cloud && S.cloud.gistId) pullCloud().catch(e=>cloudStatus('⚠️ Chưa kéo được dữ liệu từ mây: '+e.message));
+// Trên điện thoại: rời app thì đẩy ngay lên mây, quay lại app thì kéo bản mới về
+document.addEventListener('visibilitychange', ()=>{
+  if(!S.cloud || !S.cloud.gistId) return;
+  if(document.visibilityState==='hidden'){ clearTimeout(pushTimer); pushCloud(); }
+  else { pullCloud().catch(()=>{}); }
+});
 // Tự cập nhật giá khi mở app nếu giá cũ hơn 30 phút
 if(!S.prices.updated || (Date.now()-new Date(S.prices.updated).getTime()) > 30*60*1000) refreshPrices();
 </script>
