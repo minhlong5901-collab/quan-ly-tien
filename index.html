@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản Lý Tiền</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --card2:#273449; --border:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --green:#34d399; --red:#f87171;
+    --blue:#60a5fa; --amber:#fbbf24; --accent:#38bdf8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+  body{background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:70px}
+  .container{max-width:860px;margin:0 auto;padding:16px}
+  h1{font-size:20px;margin-bottom:4px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:15px;margin-bottom:12px;color:var(--accent)}
+  .total-big{font-size:28px;font-weight:700}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap}
+  .row:last-child{border-bottom:none}
+  .row .name{font-weight:600;font-size:14px}
+  .row .detail{color:var(--muted);font-size:12px}
+  .row .val{text-align:right;font-weight:600;font-size:14px}
+  .green{color:var(--green)} .red{color:var(--red)} .muted{color:var(--muted)} .amber{color:var(--amber)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:600px){.grid2{grid-template-columns:1fr}}
+  button{background:var(--accent);color:#04263a;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer}
+  button:hover{opacity:.9}
+  button.ghost{background:var(--card2);color:var(--text);border:1px solid var(--border)}
+  button.small{padding:5px 10px;font-size:12px}
+  button.danger{background:var(--red);color:#3a0404}
+  input,select{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:14px;width:100%}
+  input:focus,select:focus{outline:1px solid var(--accent)}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  .tabs{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:50}
+  .tabs button{flex:1;background:none;color:var(--muted);border-radius:0;padding:12px 4px;font-size:12px;font-weight:600}
+  .tabs button.active{color:var(--accent)}
+  .page{display:none} .page.active{display:block}
+  .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .bar-wrap{background:var(--card2);border-radius:6px;height:10px;overflow:hidden;margin-top:4px}
+  .bar{height:100%;background:var(--accent)}
+  .tag{display:inline-block;background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-size:11px;color:var(--muted)}
+  .tx-item{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:center}
+  .tx-item:last-child{border-bottom:none}
+  .price-note{font-size:11px;color:var(--muted);margin-top:6px}
+  .status{font-size:12px;margin-top:8px;color:var(--muted);white-space:pre-line}
+  .qty-input{width:120px !important;padding:6px !important;font-size:13px !important;text-align:right}
+  .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+  @media(max-width:500px){.cat-grid{grid-template-columns:repeat(2,1fr)}}
+  .cat-btn{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 6px;font-size:13px;cursor:pointer;text-align:center}
+  .cat-btn.selected{border-color:var(--accent);color:var(--accent);font-weight:700}
+  .src-btn{flex:1}
+  h3{font-size:13px;color:var(--muted);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.5px}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>💰 Quản Lý Tiền</h1>
+  <div class="sub" id="today-str"></div>
+
+  <!-- ===== TRANG TỔNG QUAN ===== -->
+  <div class="page active" id="page-overview">
+    <div class="card">
+      <h2>Tổng tài sản</h2>
+      <div class="total-big" id="total-all">0 ₫</div>
+      <div class="grid2" style="margin-top:12px">
+        <div>
+          <div class="detail muted">Tiền chi tiêu</div>
+          <div class="val green" id="total-spend" style="text-align:left;font-size:18px">0 ₫</div>
+        </div>
+        <div>
+          <div class="detail muted">Tiền đầu tư</div>
+          <div class="val blue" id="total-invest" style="text-align:left;font-size:18px;color:var(--blue)">0 ₫</div>
+        </div>
+      </div>
+      <div class="flex" style="margin-top:14px">
+        <button onclick="refreshPrices()" id="btn-refresh">🔄 Cập nhật giá</button>
+        <span class="status" id="price-status"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>💵 Tiền chi tiêu</h2>
+      <div class="row">
+        <div><div class="name">Tiền mặt</div><div class="detail">Ví của bạn</div></div>
+        <div class="val" id="v-cash">0 ₫</div>
+      </div>
+      <div class="row">
+        <div><div class="name">TPBank</div><div class="detail">Tài khoản ngân hàng</div></div>
+        <div class="val" id="v-tpbank">0 ₫</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📈 Tiền đầu tư</h2>
+      <div class="row">
+        <div><div class="name">E1VFVN30</div><div class="detail" id="d-e1">—</div></div>
+        <div class="val" id="v-e1">0 ₫</div>
+      </div>
+      <div class="row">
+        <div><div class="name">VOO</div><div class="detail" id="d-voo">—</div></div>
+        <div class="val" id="v-voo">0 ₫</div>
+      </div>
+      <div class="row">
+        <div><div class="name">USDT</div><div class="detail" id="d-usdt">—</div></div>
+        <div class="val" id="v-usdt">0 ₫</div>
+      </div>
+      <div class="row">
+        <div><div class="name">USDC</div><div class="detail" id="d-usdc">—</div></div>
+        <div class="val" id="v-usdc">0 ₫</div>
+      </div>
+      <div class="price-note" id="fx-note">Tỷ giá USD/VND: —</div>
+    </div>
+  </div>
+
+  <!-- ===== TRANG CHI TIÊU ===== -->
+  <div class="page" id="page-expense">
+    <div class="card">
+      <h2>➖ Ghi khoản chi</h2>
+      <label>Số tiền (VND)</label>
+      <input type="text" id="exp-amount" inputmode="numeric" placeholder="VD: 45000" oninput="formatMoneyInput(this)">
+      <label>Danh mục</label>
+      <div class="cat-grid" id="exp-cats"></div>
+      <label>Trừ từ nguồn</label>
+      <div class="flex">
+        <button class="ghost src-btn" id="src-cash" onclick="selectSource('cash')">💵 Tiền mặt</button>
+        <button class="ghost src-btn" id="src-tpbank" onclick="selectSource('tpbank')">🏦 TPBank</button>
+      </div>
+      <label>Ngày</label>
+      <input type="date" id="exp-date">
+      <label>Ghi chú (không bắt buộc)</label>
+      <input type="text" id="exp-note" placeholder="VD: bún bò, cà phê...">
+      <div style="margin-top:14px"><button onclick="addExpense()" style="width:100%">Lưu khoản chi</button></div>
+    </div>
+
+    <div class="card">
+      <h2>➕ Nạp thêm tiền</h2>
+      <div class="detail muted" style="margin-bottom:6px">Nhận lương, được cho tiền... cộng vào Tiền mặt / TPBank</div>
+      <label>Số tiền (VND)</label>
+      <input type="text" id="inc-amount" inputmode="numeric" placeholder="VD: 5000000" oninput="formatMoneyInput(this)">
+      <label>Cộng vào</label>
+      <select id="inc-source"><option value="tpbank">🏦 TPBank</option><option value="cash">💵 Tiền mặt</option></select>
+      <label>Ghi chú</label>
+      <input type="text" id="inc-note" placeholder="VD: lương tháng 7">
+      <div style="margin-top:14px"><button onclick="addIncome()" style="width:100%">Lưu khoản thu</button></div>
+    </div>
+
+    <div class="card">
+      <h2>🔁 Chuyển tiền với Binance</h2>
+      <div class="detail muted" style="margin-bottom:6px">
+        <b>Nạp</b>: chuyển từ ngân hàng/tiền mặt vào Binance để đầu tư ·
+        <b>Rút</b>: từ Binance về ngân hàng (VD: nhận lương USDT rồi bán về TPBank)
+      </div>
+      <label>Chiều chuyển</label>
+      <select id="tf-dir" onchange="tfDirChanged()">
+        <option value="toBinance">➡️ Nạp vào Binance (đầu tư)</option>
+        <option value="fromBinance">⬅️ Rút từ Binance về (lương / bán USDT)</option>
+      </select>
+      <label>Số tiền (VND)</label>
+      <input type="text" id="tf-amount" inputmode="numeric" placeholder="VD: 5000000" oninput="formatMoneyInput(this)">
+      <label id="tf-src-label">Trừ từ</label>
+      <select id="tf-source"><option value="tpbank">🏦 TPBank</option><option value="cash">💵 Tiền mặt</option></select>
+      <label>Ngày</label>
+      <input type="date" id="tf-date">
+      <label>Ghi chú</label>
+      <input type="text" id="tf-note" placeholder="VD: lương tháng 7 / mua USDT đầu tư">
+      <div style="margin-top:14px"><button onclick="addTransfer()" style="width:100%">Lưu giao dịch chuyển</button></div>
+      <div class="detail muted" style="margin-top:8px">Số USDT/USDC trong app sẽ tự khớp ở lần đồng bộ Binance kế tiếp (chạy file .bat hoặc Cập nhật giá).</div>
+    </div>
+
+    <div class="card">
+      <h2>Hôm nay</h2>
+      <div id="today-tx"><div class="muted" style="font-size:13px">Chưa có giao dịch nào hôm nay.</div></div>
+    </div>
+  </div>
+
+  <!-- ===== TRANG BÁO CÁO ===== -->
+  <div class="page" id="page-report">
+    <div class="card">
+      <h2>📊 Báo cáo tháng</h2>
+      <label>Chọn tháng</label>
+      <input type="month" id="report-month" onchange="renderReport()">
+      <div class="grid2" style="margin-top:12px">
+        <div><div class="detail muted">Tổng chi tiêu</div><div class="val red" id="rp-out" style="text-align:left;font-size:18px">0 ₫</div></div>
+        <div><div class="detail muted">Tổng thu</div><div class="val green" id="rp-in" style="text-align:left;font-size:18px">0 ₫</div></div>
+      </div>
+      <div class="grid2" style="margin-top:12px">
+        <div><div class="detail muted">➡️ Nạp Binance (đầu tư)</div><div class="val amber" id="rp-tobn" style="text-align:left;font-size:18px">0 ₫</div></div>
+        <div><div class="detail muted">⬅️ Rút từ Binance về</div><div class="val" id="rp-frombn" style="text-align:left;font-size:18px;color:var(--blue)">0 ₫</div></div>
+      </div>
+      <h3>Chi theo danh mục</h3>
+      <div id="rp-cats"></div>
+      <h3>Chi tiết giao dịch</h3>
+      <div id="rp-list"></div>
+      <div style="margin-top:12px"><button class="ghost" onclick="exportCSV()">⬇️ Xuất CSV tháng này</button></div>
+    </div>
+  </div>
+
+  <!-- ===== TRANG CÀI ĐẶT ===== -->
+  <div class="page" id="page-settings">
+    <div class="card">
+      <h2>⚙️ Số dư & số lượng nắm giữ</h2>
+      <div class="detail muted" style="margin-bottom:8px">Nhập số đầu kỳ. Khi mua/bán thêm, cập nhật số lượng tại đây.</div>
+      <label>Tiền mặt (VND)</label>
+      <input type="text" id="set-cash" inputmode="numeric" oninput="formatMoneyInput(this)">
+      <label>TPBank (VND)</label>
+      <input type="text" id="set-tpbank" inputmode="numeric" oninput="formatMoneyInput(this)">
+      <label>E1VFVN30 (số chứng chỉ quỹ)</label>
+      <input type="number" id="set-e1" min="0" step="any">
+      <label>VOO (số cổ phiếu, cho phép lẻ)</label>
+      <input type="number" id="set-voo" min="0" step="any">
+      <label>USDT (số lượng)</label>
+      <input type="number" id="set-usdt" min="0" step="any">
+      <label>USDC (số lượng)</label>
+      <input type="number" id="set-usdc" min="0" step="any">
+      <div style="margin-top:14px"><button onclick="saveSettings()" style="width:100%">Lưu số dư</button></div>
+      <div class="detail muted" style="margin-top:8px">Lưu ý: Tiền mặt/TPBank nhập ở đây là đặt lại số dư hiện tại (các khoản chi/thu đã ghi vẫn giữ nguyên trong báo cáo).</div>
+    </div>
+
+    <div class="card">
+      <h2>☁️ Đồng bộ đám mây (dùng chung điện thoại + máy tính)</h2>
+      <div class="detail muted" style="margin-bottom:8px">
+        Dùng GitHub (miễn phí) làm nơi lưu dữ liệu riêng tư. Tạo token tại:
+        GitHub → Settings → Developer settings → Personal access tokens → <b>Tokens (classic)</b> → Generate new token (classic) →
+        chỉ tick quyền <b>gist</b> → Generate. Dán token vào cả 2 thiết bị là dữ liệu tự đồng bộ.
+      </div>
+      <label>GitHub Token</label>
+      <input type="password" id="gh-token" placeholder="ghp_..." autocomplete="off">
+      <div class="flex" style="margin-top:12px">
+        <button onclick="cloudConnect()">Kết nối & đồng bộ</button>
+        <button class="ghost" onclick="cloudSyncNow()">🔄 Đồng bộ ngay</button>
+        <button class="danger small" onclick="cloudDisconnect()">Ngắt</button>
+      </div>
+      <div class="status" id="cloud-status"></div>
+    </div>
+
+    <div class="card">
+      <h2>🔗 Kết nối Binance (tự lấy số dư USDT/USDC)</h2>
+      <div class="detail muted" style="margin-bottom:8px">
+        Dùng API key <b>chỉ-đọc</b>: vào Binance → ảnh đại diện → <b>API Management</b> → Create API (System generated) →
+        sau khi tạo, ở Edit Restrictions chỉ tick <b>Enable Reading</b>, KHÔNG tick Withdrawals/Trading.
+        Key lưu ngay trên máy bạn, không gửi đi đâu khác ngoài Binance.
+      </div>
+      <label>API Key</label>
+      <input type="text" id="bn-key" placeholder="Dán API Key" autocomplete="off">
+      <label>Secret Key</label>
+      <input type="password" id="bn-secret" placeholder="Dán Secret Key" autocomplete="off">
+      <div class="flex" style="margin-top:12px">
+        <button class="ghost" onclick="saveBinance()">Lưu kết nối</button>
+        <button onclick="syncBinance(true)">🔄 Lấy số dư ngay</button>
+        <button class="danger small" onclick="clearBinance()">Ngắt kết nối</button>
+      </div>
+      <div class="status" id="bn-status"></div>
+      <div class="detail muted" style="margin-top:8px">Khi đã kết nối, mỗi lần "Cập nhật giá" app sẽ tự lấy số USDT/USDC từ ví <b>Spot + Funding</b> (không cần nhập tay).</div>
+      <div class="detail" style="margin-top:8px;color:var(--amber)">💡 Nếu bấm "Lấy số dư ngay" báo lỗi (trình duyệt bị chặn): hãy mở app bằng file <b>Mo-Quan-Ly-Tien.bat</b> — cách này luôn hoạt động và hoàn toàn tự động.</div>
+    </div>
+
+    <div class="card">
+      <h2>✏️ Giá thủ công (khi mạng lỗi)</h2>
+      <div class="detail muted" style="margin-bottom:8px">Nếu không tự lấy được giá, bạn có thể nhập tay tại đây.</div>
+      <label>Giá E1VFVN30 (VND / ccq)</label>
+      <input type="number" id="man-e1" step="any" placeholder="VD: 21500">
+      <label>Giá VOO (USD / cổ phiếu)</label>
+      <input type="number" id="man-voo" step="any" placeholder="VD: 620.5">
+      <label>Tỷ giá USD/VND</label>
+      <input type="number" id="man-fx" step="any" placeholder="VD: 26200">
+      <div style="margin-top:14px"><button class="ghost" onclick="saveManualPrices()">Lưu giá thủ công</button></div>
+    </div>
+
+    <div class="card">
+      <h2>🗂️ Danh mục chi tiêu</h2>
+      <div id="cat-list" class="flex" style="margin-bottom:10px"></div>
+      <div class="flex">
+        <input type="text" id="new-cat" placeholder="Tên danh mục mới" style="flex:1">
+        <button class="ghost" onclick="addCategory()">Thêm</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>💾 Sao lưu dữ liệu</h2>
+      <div class="detail muted" style="margin-bottom:10px">Dữ liệu lưu trong trình duyệt trên máy này. Nên xuất file sao lưu định kỳ.</div>
+      <div class="flex">
+        <button class="ghost" onclick="exportJSON()">⬇️ Xuất file sao lưu</button>
+        <button class="ghost" onclick="document.getElementById('import-file').click()">⬆️ Khôi phục từ file</button>
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="importJSON(event)">
+      </div>
+      <div style="margin-top:12px"><button class="danger small" onclick="resetAll()">Xóa toàn bộ dữ liệu</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="active" onclick="showPage('overview',this)">🏠 Tổng quan</button>
+  <button onclick="showPage('expense',this)">✍️ Chi tiêu</button>
+  <button onclick="showPage('report',this)">📊 Báo cáo</button>
+  <button onclick="showPage('settings',this)">⚙️ Cài đặt</button>
+</div>
+
+<script src="binance-data.js"></script>
+<script>
+/* ================= DỮ LIỆU ================= */
+const DEFAULT_CATS = ['Ăn uống','Đi lại','Mua sắm','Hóa đơn','Giải trí','Khác'];
+let S = load();
+
+function load(){
+  try{
+    const raw = localStorage.getItem('qlt-data');
+    if(raw){ const d = JSON.parse(raw); if(!d.categories||!d.categories.length) d.categories=[...DEFAULT_CATS]; return d; }
+  }catch(e){}
+  return {
+    opening:{cash:0, tpbank:0},           // số dư đặt tại thời điểm openingSince
+    openingSince: new Date().toISOString(), // các giao dịch sau mốc này mới ảnh hưởng số dư
+    qty:{e1:0, voo:0, usdt:0, usdc:0},
+    prices:{e1:null, vooUSD:null, usdtVND:null, usdcVND:null, fx:null, updated:null},
+    tx:[],                                 // {id,date,type:'chi'|'thu',amount,category,source,note}
+    categories:[...DEFAULT_CATS]
+  };
+}
+function save(push=true){
+  S.updatedAt = new Date().toISOString();
+  localStorage.setItem('qlt-data', JSON.stringify(S));
+  if(push) schedulePush();
+}
+
+/* ================= TIỆN ÍCH ================= */
+const fmt = n => (Math.round(n)).toLocaleString('vi-VN') + ' ₫';
+const fmtN = n => Number(n).toLocaleString('vi-VN');
+function parseMoney(s){ return parseInt(String(s).replace(/[^\d]/g,''),10) || 0; }
+function formatMoneyInput(el){
+  const v = parseMoney(el.value);
+  el.value = v ? v.toLocaleString('vi-VN') : '';
+}
+function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function timeAgo(iso){
+  if(!iso) return '';
+  const m = Math.floor((Date.now()-new Date(iso).getTime())/60000);
+  if(m<1) return 'vừa xong';
+  if(m<60) return m+' phút trước';
+  const h=Math.floor(m/60); if(h<24) return h+' giờ trước';
+  return Math.floor(h/24)+' ngày trước';
+}
+
+/* ================= SỐ DƯ ================= */
+function balances(){
+  let cash = S.opening.cash, tpbank = S.opening.tpbank;
+  const since = S.openingSince || '1970';
+  for(const t of S.tx){
+    if(t.createdAt && t.createdAt < since) continue;
+    let sign;
+    if(t.type==='chi') sign = -1;
+    else if(t.type==='thu') sign = 1;
+    else if(t.type==='chuyen') sign = (t.direction==='toBinance') ? -1 : 1; // nạp Binance: trừ; rút về: cộng
+    else continue;
+    if(t.source==='cash') cash += sign*t.amount; else tpbank += sign*t.amount;
+  }
+  return {cash, tpbank};
+}
+
+/* ================= GIÁ ================= */
+async function fetchWithProxies(url, asJson=true){
+  const wraps = [
+    u=>u,
+    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+    u=>'https://corsproxy.io/?url='+encodeURIComponent(u)
+  ];
+  let lastErr;
+  for(const w of wraps){
+    try{
+      const r = await fetch(w(url), {signal: AbortSignal.timeout(12000)});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return asJson ? await r.json() : await r.text();
+    }catch(e){ lastErr=e; }
+  }
+  throw lastErr;
+}
+
+async function getFX(){
+  const d = await fetchWithProxies('https://open.er-api.com/v6/latest/USD');
+  if(d && d.rates && d.rates.VND) return d.rates.VND;
+  throw new Error('no VND rate');
+}
+async function getVOO(){
+  const d = await fetchWithProxies('https://query1.finance.yahoo.com/v8/finance/chart/VOO?interval=1d&range=1d');
+  const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+  if(p) return p;
+  throw new Error('no VOO price');
+}
+async function getE1(){
+  // Nguồn 1: VNDirect dchart (dạng TradingView)
+  try{
+    const to = Math.floor(Date.now()/1000), from = to - 86400*10;
+    const d = await fetchWithProxies(`https://dchart-api.vndirect.com.vn/dchart/history?symbol=E1VFVN30&resolution=D&from=${from}&to=${to}`);
+    if(d && d.c && d.c.length){
+      let p = d.c[d.c.length-1];
+      if(p < 1000) p = p*1000; // API trả theo nghìn đồng
+      return p;
+    }
+  }catch(e){}
+  // Nguồn 2: VNDirect finfo
+  const d2 = await fetchWithProxies('https://finfo-api.vndirect.com.vn/v4/stock_prices?sort=date&q=code:E1VFVN30&size=1');
+  let p2 = d2?.data?.[0]?.close ?? d2?.data?.[0]?.adClose;
+  if(p2){ if(p2 < 1000) p2 = p2*1000; return p2; }
+  throw new Error('no E1 price');
+}
+async function getCrypto(){
+  // Nguồn 1: CoinGecko trả thẳng VND
+  try{
+    const d = await fetchWithProxies('https://api.coingecko.com/api/v3/simple/price?ids=tether,usd-coin&vs_currencies=vnd');
+    if(d?.tether?.vnd) return {usdt: d.tether.vnd, usdc: d['usd-coin'].vnd};
+  }catch(e){}
+  return null; // sẽ dùng ~1 USD × tỷ giá
+}
+
+/* ================= ĐỒNG BỘ ĐÁM MÂY (GitHub Gist) ================= */
+const GIST_FILE = 'qlt-data.json';
+let pushTimer = null;
+
+function exportState(){ const {cloud, ...rest} = S; return rest; } // không đưa token lên mây
+
+async function gistApi(path, method='GET', body){
+  const r = await fetch('https://api.github.com'+path, {
+    method,
+    headers: {
+      'Authorization': 'Bearer '+S.cloud.token,
+      'Accept': 'application/vnd.github+json',
+      ...(body ? {'Content-Type':'application/json'} : {})
+    },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(20000)
+  });
+  if(!r.ok) throw new Error('GitHub HTTP '+r.status);
+  return r.json();
+}
+
+function mergeStates(local, remote){
+  if(!remote || !remote.tx) return local;
+  const lNew = (local.updatedAt||'') >= (remote.updatedAt||'');
+  const newer = lNew ? local : remote, older = lNew ? remote : local;
+  const merged = JSON.parse(JSON.stringify(newer));
+  // gộp danh sách xóa + gộp giao dịch 2 chiều
+  merged.deleted = [...new Set([...(newer.deleted||[]), ...(older.deleted||[])])].slice(-500);
+  const ids = new Set((merged.tx||[]).map(t=>t.id));
+  for(const t of (older.tx||[])) if(!ids.has(t.id)) merged.tx.push(t);
+  merged.tx = merged.tx.filter(t=>!merged.deleted.includes(t.id));
+  return merged;
+}
+
+function cloudStatus(msg){ const el=document.getElementById('cloud-status'); if(el) el.textContent = msg; }
+
+async function cloudConnect(){
+  const token = document.getElementById('gh-token').value.trim();
+  if(!token){ alert('Dán GitHub token trước!'); return; }
+  S.cloud = {token, gistId: (S.cloud&&S.cloud.gistId)||null, lastSync:null};
+  cloudStatus('Đang kết nối GitHub...');
+  try{
+    // tìm gist dữ liệu có sẵn (nếu thiết bị khác đã tạo)
+    const gists = await gistApi('/gists');
+    const g = gists.find(x=>x.files && x.files[GIST_FILE]);
+    if(g){
+      S.cloud.gistId = g.id;
+      save(false);
+      await pullCloud();
+      cloudStatus('✅ Đã kết nối và tải dữ liệu từ đám mây về. Từ giờ tự đồng bộ.');
+    }else{
+      const created = await gistApi('/gists','POST',{
+        description:'Du lieu app Quan Ly Tien (rieng tu)', public:false,
+        files:{[GIST_FILE]:{content: JSON.stringify(exportState())}}
+      });
+      S.cloud.gistId = created.id;
+      S.cloud.lastSync = new Date().toISOString();
+      save(false);
+      cloudStatus('✅ Đã tạo kho dữ liệu trên đám mây. Trên thiết bị thứ 2, chỉ cần dán đúng token này rồi bấm "Kết nối & đồng bộ".');
+    }
+  }catch(e){
+    cloudStatus('❌ Lỗi: '+e.message+'\nKiểm tra token (phải là token classic, có quyền gist).');
+  }
+}
+
+async function pullCloud(){
+  if(!S.cloud || !S.cloud.gistId) return;
+  const g = await gistApi('/gists/'+S.cloud.gistId);
+  const f = g.files[GIST_FILE];
+  if(!f) return;
+  let content = f.content;
+  if(f.truncated){ const r = await fetch(f.raw_url); content = await r.text(); }
+  const remote = JSON.parse(content);
+  const cloud = S.cloud;
+  S = mergeStates(exportState(), remote);
+  S.cloud = cloud;
+  S.cloud.lastSync = new Date().toISOString();
+  save(false); render();
+}
+
+async function pushCloud(){
+  if(!S.cloud || !S.cloud.gistId) return;
+  try{
+    await gistApi('/gists/'+S.cloud.gistId, 'PATCH', {files:{[GIST_FILE]:{content: JSON.stringify(exportState())}}});
+    S.cloud.lastSync = new Date().toISOString();
+    save(false);
+    cloudStatus('✅ Đã đồng bộ · '+timeAgo(S.cloud.lastSync));
+  }catch(e){ cloudStatus('⚠️ Chưa đẩy được lên mây ('+e.message+'), sẽ thử lại khi bạn lưu thay đổi mới.'); }
+}
+
+function schedulePush(){
+  if(!S.cloud || !S.cloud.gistId) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushCloud, 2500);
+}
+
+async function cloudSyncNow(){
+  if(!S.cloud || !S.cloud.gistId){ cloudStatus('⚠️ Chưa kết nối. Dán token rồi bấm "Kết nối & đồng bộ".'); return; }
+  cloudStatus('Đang đồng bộ...');
+  try{ await pullCloud(); await pushCloud(); }
+  catch(e){ cloudStatus('❌ Lỗi: '+e.message); }
+}
+
+function cloudDisconnect(){
+  if(!confirm('Ngắt đồng bộ trên thiết bị này? (Dữ liệu trên mây và thiết bị khác vẫn còn)')) return;
+  delete S.cloud; save(false);
+  document.getElementById('gh-token').value='';
+  cloudStatus('Đã ngắt đồng bộ.');
+}
+
+/* ================= BINANCE ================= */
+async function hmacSHA256(secret, msg){
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(msg));
+  return Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function binanceServerTime(){
+  try{
+    const r = await fetch('https://api.binance.com/api/v3/time', {signal: AbortSignal.timeout(10000)});
+    return (await r.json()).serverTime;
+  }catch(e){ return Date.now(); }
+}
+async function binanceSigned(path, method='GET', params={}){
+  const bn = S.binance;
+  const ts = await binanceServerTime();
+  const qs = new URLSearchParams({...params, timestamp: ts, recvWindow: 30000}).toString();
+  const sig = await hmacSHA256(bn.secret, qs);
+  const url = `https://api.binance.com${path}?${qs}&signature=${sig}`;
+  const r = await fetch(url, {method, headers: {'X-MBX-APIKEY': bn.key}, signal: AbortSignal.timeout(15000)});
+  const d = await r.json();
+  if(!r.ok || d.code < 0) throw new Error(d.msg || ('HTTP '+r.status));
+  return d;
+}
+async function syncBinance(manual=false){
+  const st = document.getElementById('bn-status');
+  if(!S.binance || !S.binance.key || !S.binance.secret){
+    if(manual){ st.textContent = '⚠️ Chưa lưu API Key + Secret.'; }
+    return false;
+  }
+  if(manual) st.textContent = 'Đang lấy số dư từ Binance...';
+  let usdt = 0, usdc = 0, parts = [], err = [];
+  // Ví Spot
+  try{
+    const acc = await binanceSigned('/api/v3/account', 'GET', {omitZeroBalances:'true'});
+    for(const b of (acc.balances||[])){
+      const v = parseFloat(b.free) + parseFloat(b.locked);
+      if(b.asset==='USDT') usdt += v;
+      if(b.asset==='USDC') usdc += v;
+    }
+    parts.push('Spot ✅');
+  }catch(e){ err.push('Spot: '+e.message); }
+  // Ví Funding
+  try{
+    const fund = await binanceSigned('/sapi/v1/asset/get-funding-asset', 'POST');
+    for(const b of (fund||[])){
+      const v = parseFloat(b.free||0) + parseFloat(b.locked||0) + parseFloat(b.freeze||0);
+      if(b.asset==='USDT') usdt += v;
+      if(b.asset==='USDC') usdc += v;
+    }
+    parts.push('Funding ✅');
+  }catch(e){ err.push('Funding: '+e.message); }
+
+  if(parts.length){
+    S.qty.usdt = Math.round(usdt*100)/100;
+    S.qty.usdc = Math.round(usdc*100)/100;
+    S.binance.lastSync = new Date().toISOString();
+    save(); render();
+    st.textContent = `✅ Đã lấy số dư (${parts.join(', ')}): USDT ${S.qty.usdt} · USDC ${S.qty.usdc}` + (err.length ? `\n⚠️ ${err.join(' · ')}` : '');
+    return true;
+  }
+  st.textContent = '❌ Trình duyệt bị Binance chặn gọi trực tiếp (CORS).\n👉 Hãy mở app bằng file "Mo-Quan-Ly-Tien.bat" (cùng thư mục) — nó sẽ tự lấy số dư rồi mở app, không bị chặn.';
+  return false;
+}
+function saveBinance(){
+  const key = document.getElementById('bn-key').value.trim();
+  const secret = document.getElementById('bn-secret').value.trim();
+  if(!key || !secret){ alert('Dán đủ API Key và Secret Key!'); return; }
+  S.binance = {key, secret, lastSync: null};
+  save();
+  document.getElementById('bn-status').textContent = 'Đã lưu. Bấm "Lấy số dư ngay" để thử.';
+}
+function clearBinance(){
+  if(!confirm('Xóa API key khỏi app?')) return;
+  delete S.binance; save();
+  document.getElementById('bn-key').value=''; document.getElementById('bn-secret').value='';
+  document.getElementById('bn-status').textContent = 'Đã ngắt kết nối.';
+}
+
+async function refreshPrices(){
+  const btn = document.getElementById('btn-refresh');
+  const st = document.getElementById('price-status');
+  btn.disabled = true; st.textContent = 'Đang cập nhật giá...';
+  const results = [];
+
+  const [fx, voo, e1, crypto, bn] = await Promise.allSettled([getFX(), getVOO(), getE1(), getCrypto(), syncBinance(false)]);
+  if(bn.status==='fulfilled' && bn.value===true) results.push('✅ Số dư Binance');
+
+  if(fx.status==='fulfilled'){ S.prices.fx = fx.value; results.push('✅ Tỷ giá'); }
+  else results.push('⚠️ Tỷ giá lỗi' + (S.prices.fx ? ' (dùng giá cũ)' : ''));
+
+  if(voo.status==='fulfilled'){ S.prices.vooUSD = voo.value; results.push('✅ VOO'); }
+  else results.push('⚠️ VOO lỗi' + (S.prices.vooUSD ? ' (dùng giá cũ)' : ' — nhập tay ở Cài đặt'));
+
+  if(e1.status==='fulfilled'){ S.prices.e1 = e1.value; results.push('✅ E1VFVN30'); }
+  else results.push('⚠️ E1VFVN30 lỗi' + (S.prices.e1 ? ' (dùng giá cũ)' : ' — nhập tay ở Cài đặt'));
+
+  if(crypto.status==='fulfilled' && crypto.value){
+    S.prices.usdtVND = crypto.value.usdt; S.prices.usdcVND = crypto.value.usdc;
+    results.push('✅ USDT/USDC');
+  } else if(S.prices.fx){
+    S.prices.usdtVND = S.prices.fx; S.prices.usdcVND = S.prices.fx; // stablecoin ≈ 1 USD
+    results.push('ℹ️ USDT/USDC tính ≈ 1 USD');
+  }
+
+  S.prices.updated = new Date().toISOString();
+  save(); render();
+  st.textContent = results.join('  ·  ');
+  btn.disabled = false;
+}
+
+/* ================= HIỂN THỊ ================= */
+function render(){
+  const b = balances();
+  const P = S.prices;
+  const e1V   = (S.qty.e1  || 0) * (P.e1 || 0);
+  const vooV  = (S.qty.voo || 0) * (P.vooUSD || 0) * (P.fx || 0);
+  const usdtV = (S.qty.usdt|| 0) * (P.usdtVND || 0);
+  const usdcV = (S.qty.usdc|| 0) * (P.usdcVND || 0);
+  const spend = b.cash + b.tpbank;
+  const invest = e1V + vooV + usdtV + usdcV;
+
+  document.getElementById('total-all').textContent = fmt(spend+invest);
+  document.getElementById('total-spend').textContent = fmt(spend);
+  document.getElementById('total-invest').textContent = fmt(invest);
+  document.getElementById('v-cash').textContent = fmt(b.cash);
+  document.getElementById('v-tpbank').textContent = fmt(b.tpbank);
+  document.getElementById('v-e1').textContent = fmt(e1V);
+  document.getElementById('v-voo').textContent = fmt(vooV);
+  document.getElementById('v-usdt').textContent = fmt(usdtV);
+  document.getElementById('v-usdc').textContent = fmt(usdcV);
+  document.getElementById('d-e1').textContent  = `${fmtN(S.qty.e1||0)} ccq × ${P.e1 ? fmtN(P.e1)+' ₫' : '—'}`;
+  document.getElementById('d-voo').textContent = `${fmtN(S.qty.voo||0)} cp × ${P.vooUSD ? '$'+P.vooUSD.toLocaleString('en-US',{maximumFractionDigits:2}) : '—'}`;
+  document.getElementById('d-usdt').textContent = `${fmtN(S.qty.usdt||0)} × ${P.usdtVND ? fmtN(Math.round(P.usdtVND))+' ₫' : '—'}`;
+  document.getElementById('d-usdc').textContent = `${fmtN(S.qty.usdc||0)} × ${P.usdcVND ? fmtN(Math.round(P.usdcVND))+' ₫' : '—'}`;
+  document.getElementById('fx-note').textContent =
+    `Tỷ giá USD/VND: ${P.fx ? fmtN(Math.round(P.fx)) : '—'}` + (P.updated ? ` · Giá cập nhật ${timeAgo(P.updated)}` : '');
+
+  renderTodayTx();
+  renderCats();
+  renderCatList();
+  fillSettings();
+}
+
+function renderTodayTx(){
+  const el = document.getElementById('today-tx');
+  const t = todayStr();
+  const list = S.tx.filter(x=>x.date===t).sort((a,b)=>b.id-a.id);
+  if(!list.length){ el.innerHTML = '<div class="muted" style="font-size:13px">Chưa có giao dịch nào hôm nay.</div>'; return; }
+  let out = 0;
+  el.innerHTML = list.map(x=>{
+    if(x.type==='chi') out += x.amount;
+    return txRow(x);
+  }).join('') + `<div style="margin-top:8px;font-size:13px" class="muted">Tổng chi hôm nay: <b class="red">${fmt(out)}</b></div>`;
+}
+function txRow(x){
+  const src = x.source==='cash' ? '💵' : '🏦';
+  let sign, cls;
+  if(x.type==='chuyen'){
+    if(x.direction==='toBinance'){ sign='-'; cls='amber'; } else { sign='+'; cls='green'; }
+  }else{
+    sign = x.type==='chi' ? '-' : '+';
+    cls = x.type==='chi' ? 'red' : 'green';
+  }
+  return `<div class="tx-item">
+    <div><b>${x.category}</b> ${x.note?('· '+escapeHtml(x.note)):''}<br><span class="muted">${x.date} ${src}</span></div>
+    <div class="flex" style="flex-wrap:nowrap"><span class="${cls}">${sign}${fmt(x.amount)}</span>
+    <button class="small danger" onclick="deleteTx(${x.id})">✕</button></div>
+  </div>`;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ================= CHI TIÊU ================= */
+let selCat = null, selSrc = 'cash';
+function renderCats(){
+  const el = document.getElementById('exp-cats');
+  el.innerHTML = S.categories.map(c=>
+    `<div class="cat-btn ${selCat===c?'selected':''}" onclick="selectCat('${c.replace(/'/g,"\\'")}')">${c}</div>`).join('');
+}
+function selectCat(c){ selCat=c; renderCats(); }
+function selectSource(s){
+  selSrc=s;
+  document.getElementById('src-cash').classList.toggle('selected', s==='cash');
+  document.getElementById('src-tpbank').classList.toggle('selected', s==='tpbank');
+  document.getElementById('src-cash').style.borderColor = s==='cash'?'var(--accent)':'var(--border)';
+  document.getElementById('src-tpbank').style.borderColor = s==='tpbank'?'var(--accent)':'var(--border)';
+}
+function addExpense(){
+  const amount = parseMoney(document.getElementById('exp-amount').value);
+  if(!amount){ alert('Nhập số tiền!'); return; }
+  if(!selCat){ alert('Chọn danh mục!'); return; }
+  const date = document.getElementById('exp-date').value || todayStr();
+  const note = document.getElementById('exp-note').value.trim();
+  S.tx.push({id:Date.now(), date, type:'chi', amount, category:selCat, source:selSrc, note, createdAt:new Date().toISOString()});
+  save();
+  document.getElementById('exp-amount').value=''; document.getElementById('exp-note').value='';
+  render();
+  alert(`Đã trừ ${fmt(amount)} từ ${selSrc==='cash'?'Tiền mặt':'TPBank'}`);
+}
+function addIncome(){
+  const amount = parseMoney(document.getElementById('inc-amount').value);
+  if(!amount){ alert('Nhập số tiền!'); return; }
+  const source = document.getElementById('inc-source').value;
+  const note = document.getElementById('inc-note').value.trim();
+  S.tx.push({id:Date.now(), date:todayStr(), type:'thu', amount, category:'Thu nhập', source, note, createdAt:new Date().toISOString()});
+  save();
+  document.getElementById('inc-amount').value=''; document.getElementById('inc-note').value='';
+  render();
+  alert(`Đã cộng ${fmt(amount)} vào ${source==='cash'?'Tiền mặt':'TPBank'}`);
+}
+function tfDirChanged(){
+  const d = document.getElementById('tf-dir').value;
+  document.getElementById('tf-src-label').textContent = d==='toBinance' ? 'Trừ từ' : 'Cộng vào';
+}
+function addTransfer(){
+  const amount = parseMoney(document.getElementById('tf-amount').value);
+  if(!amount){ alert('Nhập số tiền!'); return; }
+  const direction = document.getElementById('tf-dir').value;
+  const source = document.getElementById('tf-source').value;
+  const date = document.getElementById('tf-date').value || todayStr();
+  const note = document.getElementById('tf-note').value.trim();
+  S.tx.push({
+    id:Date.now(), date, type:'chuyen', direction, amount,
+    category: direction==='toBinance' ? 'Nạp Binance (đầu tư)' : 'Rút từ Binance',
+    source, note, createdAt:new Date().toISOString()
+  });
+  save();
+  document.getElementById('tf-amount').value=''; document.getElementById('tf-note').value='';
+  render();
+  const srcName = source==='cash' ? 'Tiền mặt' : 'TPBank';
+  alert(direction==='toBinance'
+    ? `Đã trừ ${fmt(amount)} từ ${srcName} — chuyển vào Binance để đầu tư`
+    : `Đã cộng ${fmt(amount)} vào ${srcName} — rút từ Binance về`);
+}
+function deleteTx(id){
+  if(!confirm('Xóa giao dịch này? Số dư sẽ được hoàn lại.')) return;
+  S.tx = S.tx.filter(x=>x.id!==id);
+  S.deleted = [...(S.deleted||[]), id].slice(-500); // để không "sống lại" khi đồng bộ
+  save(); render(); renderReport();
+}
+
+/* ================= BÁO CÁO ================= */
+function renderReport(){
+  const m = document.getElementById('report-month').value; // yyyy-mm
+  if(!m) return;
+  const list = S.tx.filter(x=>x.date.startsWith(m)).sort((a,b)=> b.date.localeCompare(a.date) || b.id-a.id);
+  let out=0, inc=0, toBn=0, fromBn=0; const byCat={};
+  for(const x of list){
+    if(x.type==='chi'){ out+=x.amount; byCat[x.category]=(byCat[x.category]||0)+x.amount; }
+    else if(x.type==='thu') inc+=x.amount;
+    else if(x.type==='chuyen'){ if(x.direction==='toBinance') toBn+=x.amount; else fromBn+=x.amount; }
+  }
+  document.getElementById('rp-out').textContent = fmt(out);
+  document.getElementById('rp-in').textContent = fmt(inc);
+  document.getElementById('rp-tobn').textContent = fmt(toBn);
+  document.getElementById('rp-frombn').textContent = fmt(fromBn);
+  const cats = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('rp-cats').innerHTML = cats.length ? cats.map(([c,v])=>`
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span>${c}</span><b>${fmt(v)} <span class="muted">(${out?Math.round(v/out*100):0}%)</span></b></div>
+      <div class="bar-wrap"><div class="bar" style="width:${out?Math.round(v/out*100):0}%"></div></div>
+    </div>`).join('') : '<div class="muted" style="font-size:13px">Chưa có khoản chi trong tháng này.</div>';
+  document.getElementById('rp-list').innerHTML = list.length ? list.map(txRow).join('') : '<div class="muted" style="font-size:13px">Không có giao dịch.</div>';
+}
+function exportCSV(){
+  const m = document.getElementById('report-month').value;
+  const list = S.tx.filter(x=>x.date.startsWith(m)).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!list.length){ alert('Không có giao dịch trong tháng này.'); return; }
+  let csv = '﻿Ngày,Loại,Danh mục,Số tiền (VND),Nguồn,Ghi chú\n';
+  for(const x of list){
+    const loai = x.type==='chi' ? 'Chi' : x.type==='thu' ? 'Thu' : (x.direction==='toBinance' ? 'Nạp Binance' : 'Rút Binance');
+    csv += `${x.date},${loai},${x.category},${x.amount},${x.source==='cash'?'Tiền mặt':'TPBank'},"${(x.note||'').replace(/"/g,'""')}"\n`;
+  }
+  downloadFile(csv, `chi-tieu-${m}.csv`, 'text/csv');
+}
+
+/* ================= CÀI ĐẶT ================= */
+function fillSettings(){
+  const b = balances();
+  document.getElementById('set-cash').value = fmtN(b.cash);
+  document.getElementById('set-tpbank').value = fmtN(b.tpbank);
+  document.getElementById('set-e1').value = S.qty.e1||'';
+  document.getElementById('set-voo').value = S.qty.voo||'';
+  document.getElementById('set-usdt').value = S.qty.usdt||'';
+  document.getElementById('set-usdc').value = S.qty.usdc||'';
+  if(S.cloud && S.cloud.token){
+    document.getElementById('gh-token').value = S.cloud.token;
+    if(S.cloud.gistId && S.cloud.lastSync) cloudStatus('✅ Đang đồng bộ đám mây · lần cuối '+timeAgo(S.cloud.lastSync));
+  }
+  if(S.binance && S.binance.key){
+    document.getElementById('bn-key').value = S.binance.key;
+    document.getElementById('bn-secret').value = S.binance.secret;
+    if(S.binance.lastSync) document.getElementById('bn-status').textContent = '✅ Đã kết nối · Lần lấy số dư gần nhất: ' + timeAgo(S.binance.lastSync);
+  }
+  document.getElementById('man-e1').value = S.prices.e1||'';
+  document.getElementById('man-voo').value = S.prices.vooUSD||'';
+  document.getElementById('man-fx').value = S.prices.fx ? Math.round(S.prices.fx) : '';
+}
+function saveSettings(){
+  // Đặt lại số dư hiện tại: opening = giá trị nhập, mốc = bây giờ
+  S.opening.cash = parseMoney(document.getElementById('set-cash').value);
+  S.opening.tpbank = parseMoney(document.getElementById('set-tpbank').value);
+  S.openingSince = new Date().toISOString();
+  S.qty.e1 = parseFloat(document.getElementById('set-e1').value)||0;
+  S.qty.voo = parseFloat(document.getElementById('set-voo').value)||0;
+  S.qty.usdt = parseFloat(document.getElementById('set-usdt').value)||0;
+  S.qty.usdc = parseFloat(document.getElementById('set-usdc').value)||0;
+  save(); render();
+  alert('Đã lưu số dư!');
+}
+function saveManualPrices(){
+  const e1 = parseFloat(document.getElementById('man-e1').value);
+  const voo = parseFloat(document.getElementById('man-voo').value);
+  const fx = parseFloat(document.getElementById('man-fx').value);
+  if(e1) S.prices.e1 = e1;
+  if(voo) S.prices.vooUSD = voo;
+  if(fx){ S.prices.fx = fx; if(!S.prices.usdtVND) S.prices.usdtVND = fx; if(!S.prices.usdcVND) S.prices.usdcVND = fx; }
+  S.prices.updated = new Date().toISOString();
+  save(); render();
+  alert('Đã lưu giá thủ công!');
+}
+function renderCatList(){
+  document.getElementById('cat-list').innerHTML = S.categories.map(c=>
+    `<span class="tag">${c} <span style="cursor:pointer;color:var(--red)" onclick="removeCategory('${c.replace(/'/g,"\\'")}')">✕</span></span>`).join('');
+}
+function addCategory(){
+  const v = document.getElementById('new-cat').value.trim();
+  if(!v) return;
+  if(!S.categories.includes(v)) S.categories.push(v);
+  document.getElementById('new-cat').value='';
+  save(); render();
+}
+function removeCategory(c){
+  if(S.categories.length<=1){ alert('Phải giữ lại ít nhất 1 danh mục.'); return; }
+  S.categories = S.categories.filter(x=>x!==c);
+  if(selCat===c) selCat=null;
+  save(); render();
+}
+
+/* ================= SAO LƯU ================= */
+function downloadFile(content, name, type){
+  const blob = new Blob([content], {type});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function exportJSON(){
+  downloadFile(JSON.stringify(exportState(),null,2), `quan-ly-tien-backup-${todayStr()}.json`, 'application/json');
+}
+function importJSON(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e=>{
+    try{
+      const d = JSON.parse(e.target.result);
+      if(!d.qty || !d.tx){ alert('File không hợp lệ.'); return; }
+      S = d; save(); render(); renderReport();
+      alert('Đã khôi phục dữ liệu!');
+    }catch(err){ alert('File không hợp lệ.'); }
+  };
+  r.readAsText(f);
+  ev.target.value='';
+}
+function resetAll(){
+  if(!confirm('Xóa TOÀN BỘ dữ liệu? Không thể hoàn tác!')) return;
+  if(!confirm('Chắc chắn chứ? Nên xuất file sao lưu trước.')) return;
+  localStorage.removeItem('qlt-data');
+  location.reload();
+}
+
+/* ================= ĐIỀU HƯỚNG ================= */
+function showPage(p, btn){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+  if(p==='report'){ if(!document.getElementById('report-month').value) document.getElementById('report-month').value = todayStr().slice(0,7); renderReport(); }
+  window.scrollTo(0,0);
+}
+
+/* ================= KHỞI ĐỘNG ================= */
+document.getElementById('today-str').textContent = new Date().toLocaleDateString('vi-VN',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+document.getElementById('exp-date').value = todayStr();
+document.getElementById('tf-date').value = todayStr();
+selectSource('cash');
+// Đọc số dư Binance từ file binance-data.js (do script cap-nhat-binance tạo)
+if(window.BINANCE_DATA && BINANCE_DATA.updated && BINANCE_DATA.updated !== S.lastBnFile){
+  S.qty.usdt = BINANCE_DATA.usdt;
+  S.qty.usdc = BINANCE_DATA.usdc;
+  S.lastBnFile = BINANCE_DATA.updated;
+  save();
+}
+render();
+// Kéo dữ liệu mới nhất từ đám mây khi mở app
+if(S.cloud && S.cloud.gistId) pullCloud().catch(e=>cloudStatus('⚠️ Chưa kéo được dữ liệu từ mây: '+e.message));
+// Tự cập nhật giá khi mở app nếu giá cũ hơn 30 phút
+if(!S.prices.updated || (Date.now()-new Date(S.prices.updated).getTime()) > 30*60*1000) refreshPrices();
+</script>
+</body>
+</html>
