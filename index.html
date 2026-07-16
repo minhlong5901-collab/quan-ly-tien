@@ -163,7 +163,7 @@
         </div>
       </div>
       <div id="advice" style="margin-top:12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.55"></div>
-      <div class="detail muted" style="margin-top:6px">Gợi ý tự động dựa trên dữ liệu của bạn, cập nhật theo thời gian thực — chỉ mang tính tham khảo, không phải lời khuyên đầu tư.</div>
+      <div class="detail muted" style="margin-top:6px">Gợi ý tham khảo, không phải lời khuyên đầu tư.</div>
     </div>
 
     <div class="card">
@@ -204,8 +204,8 @@
   <div class="page" id="page-expense">
     <div class="card">
       <h2>➖ Ghi khoản chi</h2>
-      <label>Số tiền (VND)</label>
-      <input type="text" id="exp-amount" inputmode="numeric" placeholder="VD: 45000" oninput="formatMoneyInput(this)">
+      <label>Ngày</label>
+      <input type="date" id="exp-date">
       <label>Danh mục</label>
       <div class="cat-grid" id="exp-cats"></div>
       <label>Trừ từ nguồn</label>
@@ -213,8 +213,8 @@
         <button class="ghost src-btn" id="src-cash" onclick="selectSource('cash')">💵 Tiền mặt</button>
         <button class="ghost src-btn" id="src-tpbank" onclick="selectSource('tpbank')">🏦 TPBank</button>
       </div>
-      <label>Ngày</label>
-      <input type="date" id="exp-date">
+      <label>Số tiền (VND)</label>
+      <input type="text" id="exp-amount" inputmode="numeric" placeholder="VD: 45000" oninput="formatMoneyInput(this)">
       <label>Ghi chú (không bắt buộc)</label>
       <input type="text" id="exp-note" placeholder="VD: bún bò, cà phê...">
       <div style="margin-top:14px"><button onclick="addExpense()" style="width:100%">Lưu khoản chi</button></div>
@@ -234,7 +234,6 @@
 
     <div class="card">
       <h2>🏧 Rút / nộp tiền mặt</h2>
-      <div class="detail muted" style="margin-bottom:6px">Chuyển qua lại giữa TPBank và Tiền mặt — tổng tài sản không đổi, chỉ đổi chỗ.</div>
       <label>Chiều chuyển</label>
       <select id="atm-dir">
         <option value="ruttien">🏧 Rút ATM: TPBank → Tiền mặt</option>
@@ -251,10 +250,6 @@
 
     <div class="card">
       <h2>🔁 Chuyển tiền với Binance</h2>
-      <div class="detail muted" style="margin-bottom:6px">
-        <b>Nạp</b>: chuyển từ ngân hàng/tiền mặt vào Binance để đầu tư ·
-        <b>Rút</b>: từ Binance về ngân hàng (VD: nhận lương USDT rồi bán về TPBank)
-      </div>
       <label>Chiều chuyển</label>
       <select id="tf-dir" onchange="tfDirChanged()">
         <option value="toBinance">➡️ Nạp vào Binance (đầu tư)</option>
@@ -272,7 +267,6 @@
       <label>Ghi chú</label>
       <input type="text" id="tf-note" placeholder="VD: lương tháng 7 / mua USDT đầu tư">
       <div style="margin-top:14px"><button onclick="addTransfer()" style="width:100%">Lưu giao dịch chuyển</button></div>
-      <div class="detail muted" style="margin-top:8px">Mục này chỉ trừ/cộng tiền ngân hàng & ghi sổ. Sau khi giao dịch xong trên Binance, nhớ vào tab <b>Cài đặt</b> cập nhật lại số lượng USDT/USDC/VOO đang nắm giữ.</div>
     </div>
 
     <div class="card">
@@ -336,7 +330,6 @@
   <div class="page" id="page-settings">
     <div class="card">
       <h2>⚙️ Số dư & số lượng nắm giữ</h2>
-      <div class="detail muted" style="margin-bottom:8px">Nhập số đầu kỳ. Khi mua/bán thêm, cập nhật số lượng tại đây.</div>
       <label>Tiền mặt (VND)</label>
       <input type="text" id="set-cash" inputmode="numeric" oninput="formatMoneyInput(this)">
       <label>TPBank (VND)</label>
@@ -350,16 +343,11 @@
       <label>USDC (số lượng)</label>
       <input type="number" id="set-usdc" min="0" step="any">
       <div style="margin-top:14px"><button onclick="saveSettings()" style="width:100%">Lưu số dư</button></div>
-      <div class="detail muted" style="margin-top:8px">Lưu ý: Tiền mặt/TPBank nhập ở đây là đặt lại số dư hiện tại (các khoản chi/thu đã ghi vẫn giữ nguyên trong báo cáo).</div>
     </div>
 
     <div class="card">
-      <h2>☁️ Đồng bộ đám mây (dùng chung điện thoại + máy tính)</h2>
-      <div class="detail muted" style="margin-bottom:8px">
-        Dùng GitHub (miễn phí) làm nơi lưu dữ liệu riêng tư. Tạo token tại:
-        GitHub → Settings → Developer settings → Personal access tokens → <b>Tokens (classic)</b> → Generate new token (classic) →
-        chỉ tick quyền <b>gist</b> → Generate. Dán token vào cả 2 thiết bị là dữ liệu tự đồng bộ.
-      </div>
+      <h2>☁️ Đồng bộ & sao lưu</h2>
+      <div class="detail muted" style="margin-bottom:4px">Tự sao lưu sau mỗi lần nhập · tự tải bản mới khi mở app</div>
       <label>GitHub Token</label>
       <input type="password" id="gh-token" placeholder="ghp_..." autocomplete="off">
       <div class="flex" style="margin-top:12px">
@@ -374,24 +362,27 @@
     </div>
 
     <div class="card">
-      <h2>🗣️ Giọng AI ElevenLabs (siêu mượt, tùy chọn)</h2>
-      <div class="detail muted" style="margin-bottom:8px">
-        Giọng AI mượt như người thật, vượt giới hạn giọng của iPhone. Tạo tài khoản miễn phí tại <b>elevenlabs.io</b>
-        → biểu tượng tài khoản → <b>API Keys</b> → Create Key → dán vào đây. Key chỉ lưu trên máy này, không đồng bộ đi đâu.
-      </div>
+      <h2>🔊 Giọng bé trợ lý</h2>
+      <label>Âm lượng <span id="vol-val" style="float:right;color:var(--muted)">100%</span></label>
+      <input type="range" id="vol-slider" min="0" max="100" step="5" oninput="setVolume(this.value)" onchange="volumeChanged()">
+      <label>Tông giọng máy <span id="pitch-val" style="float:right;color:var(--muted)">1.4</span></label>
+      <input type="range" id="pitch-slider" min="8" max="20" step="1" oninput="setPitch(this.value)">
+      <label>Giọng máy (dự phòng khi AI lỗi)</label>
+      <select id="voice-select" onchange="chooseVoice(this.value)"></select>
+      <h3>Giọng AI ElevenLabs</h3>
       <label>API Key</label>
       <input type="password" id="el-key" placeholder="sk_..." autocomplete="off">
-      <label>Chọn giọng</label>
+      <label>Giọng AI</label>
       <div class="flex">
-        <select id="el-voice" style="flex:1"><option value="">— Dán key rồi bấm "Tải giọng" —</option></select>
+        <select id="el-voice" style="flex:1"><option value="">—</option></select>
         <button class="ghost small" onclick="elLoadVoices()">Tải giọng</button>
       </div>
       <div class="flex" style="margin-top:12px">
-        <button onclick="elSave()">Lưu & nghe thử</button>
-        <button class="danger small" onclick="elClear()">Tắt giọng AI</button>
+        <button onclick="elSave()">Lưu giọng AI</button>
+        <button class="ghost" onclick="testVoice()">▶️ Nghe thử</button>
+        <button class="danger small" onclick="elClear()">Tắt AI</button>
       </div>
       <div class="status" id="el-status"></div>
-      <div class="detail muted" style="margin-top:8px">Khi bật: bé trợ lý nói bằng giọng AI (cần mạng, tốn hạn mức ~10 phút/tháng gói miễn phí). Khi lỗi/hết hạn mức: tự quay về giọng máy.</div>
     </div>
 
     <div class="card">
@@ -403,9 +394,20 @@
       </div>
     </div>
 
+    <div class="card">
+      <h2>🔒 Khóa app</h2>
+      <label>Mã PIN (4–6 số)</label>
+      <input type="password" id="set-pin" inputmode="numeric" maxlength="6" placeholder="VD: 1234">
+      <div class="flex" style="margin-top:12px">
+        <button onclick="enablePin()">Bật khóa PIN</button>
+        <button class="ghost" id="btn-bio" onclick="enableBio()" style="display:none">🪪 Bật Face ID</button>
+        <button class="danger small" onclick="disableLock()">Tắt khóa</button>
+      </div>
+      <div class="status" id="lock-status"></div>
+    </div>
+
     <div class="card" id="card-backup">
-      <h2>💾 Sao lưu dữ liệu</h2>
-      <div class="detail muted" style="margin-bottom:10px">Dữ liệu lưu trong trình duyệt trên máy này. Nên xuất file sao lưu định kỳ.</div>
+      <h2>💾 File sao lưu</h2>
       <div class="flex">
         <button class="ghost" onclick="exportJSON()">⬇️ Xuất file sao lưu</button>
         <button class="ghost" onclick="document.getElementById('import-file').click()">⬆️ Khôi phục từ file</button>
@@ -416,21 +418,6 @@
   </div>
 </div>
 
-<button id="vol-btn" class="ghost" onclick="toggleVolPanel()" title="Âm lượng trợ lý"
-  style="position:fixed;right:23px;bottom:156px;width:44px;height:44px;border-radius:50%;font-size:17px;z-index:60;padding:0">🔊</button>
-<div id="vol-panel" style="position:fixed;right:76px;bottom:120px;z-index:65;width:250px;background:rgba(17,24,42,.96);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:16px;padding:14px;display:none;flex-direction:column;gap:4px;box-shadow:0 10px 28px rgba(0,0,0,.5)">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-    <img src="tro-ly.png" alt="" onerror="this.remove()" style="width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid rgba(56,189,248,.5)">
-    <span style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px">🎀 Tùy chỉnh bé trợ lý</span>
-  </div>
-  <label style="margin-top:2px">Âm lượng <span id="vol-val" style="float:right;color:var(--muted)">100%</span></label>
-  <input type="range" id="vol-slider" min="0" max="100" step="5" oninput="setVolume(this.value)">
-  <label>Tông giọng (cao = cute hơn) <span id="pitch-val" style="float:right;color:var(--muted)">1.4</span></label>
-  <input type="range" id="pitch-slider" min="8" max="20" step="1" oninput="setPitch(this.value)">
-  <label>Giọng đọc</label>
-  <select id="voice-select" onchange="chooseVoice(this.value)" style="font-size:13px;padding:8px"></select>
-  <button class="ghost small" onclick="testVoice()" style="margin-top:10px">▶️ Nghe thử</button>
-</div>
 <button id="voice-btn" onclick="startVoice()" title="Gọi bé trợ lý"
   style="position:fixed;right:16px;bottom:88px;width:58px;height:58px;border-radius:50%;font-size:24px;z-index:60;padding:0;box-shadow:0 8px 26px rgba(56,189,248,.5);overflow:hidden">
   <span id="voice-emoji">🎤</span>
@@ -440,6 +427,16 @@
     style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover">
 </button>
 <div id="toast" style="position:fixed;left:50%;bottom:160px;transform:translateX(-50%);background:#0d1526;border:1px solid var(--border);border-radius:16px;padding:11px 14px;font-size:13px;z-index:70;display:none;max-width:86%;box-shadow:0 12px 32px rgba(0,0,0,.55);line-height:1.5;align-items:center;gap:10px"></div>
+
+<div id="lock-screen" style="position:fixed;inset:0;z-index:100;background:rgba(8,13,28,.98);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+  <img src="tro-ly.png" alt="" onerror="this.style.display='none'" style="width:84px;height:84px;border-radius:50%;object-fit:cover;border:3px solid rgba(56,189,248,.5)">
+  <div style="font-weight:800;font-size:17px">🔒 App đã khóa</div>
+  <input type="password" id="lock-pin" inputmode="numeric" maxlength="6" placeholder="Nhập mã PIN"
+    onkeydown="if(event.key==='Enter')tryUnlockPin()" style="width:210px;text-align:center;font-size:18px;letter-spacing:5px">
+  <button onclick="tryUnlockPin()" style="width:210px">Mở khóa</button>
+  <button class="ghost" id="lock-bio" onclick="tryUnlockBio()" style="width:210px;display:none">🪪 Face ID / Vân tay</button>
+  <div class="detail muted" id="lock-msg"></div>
+</div>
 
 <div class="tabs">
   <button class="active" onclick="showPage('overview',this)">🏠 Tổng quan</button>
@@ -790,6 +787,18 @@ function renderAllocation(spend, invest){
         }
       }
     }
+    // dự báo chi tiêu cuối tháng theo đà hiện tại + so với tháng trước
+    const fcDay = parseInt(todayStr().slice(8,10),10);
+    const fcThis = monthChi(ymOffset(0)), fcLast = monthChi(ymOffset(-1));
+    if(fcThis > 0 && fcDay >= 5){
+      const fc = fcThis/fcDay*30;
+      let cmp = '';
+      if(fcLast > 0){
+        const pc = Math.round((fc/fcLast-1)*100);
+        cmp = pc > 5 ? ` — đang <b class="red">cao hơn tháng trước ${pc}%</b>` : pc < -5 ? ` — <b class="green">thấp hơn tháng trước ${-pc}%</b>, quá đỉnh!` : ' — ngang nhịp tháng trước';
+      }
+      msgs.push(`📈 Đà chi hiện tại: đã chi ${fmt(fcThis)} trong ${fcDay} ngày → cả tháng dự kiến <b>~${fmt(fc)}</b>${cmp}.`);
+    }
     if(pctI > 90) msgs.push('⚠️ Gần như toàn bộ tiền đang nằm ở kênh đầu tư. Nên giữ một phần ở tiền mặt/ngân hàng phòng lúc cần gấp, khỏi phải bán lúc giá xấu.');
   }
   document.getElementById('advice').innerHTML = msgs.map(m=>'💡 '+m).join('<br>');
@@ -815,33 +824,76 @@ function fmtShort(n){
   if(a>=1e3) return Math.round(n/1e3)+'k';
   return String(Math.round(n));
 }
-function renderHistory(){
+function buildDailySeries(){
   const h = S.history||{};
-  const keysAll = Object.keys(h).sort();
+  const snapKeys = Object.keys(h).filter(k=>typeof h[k]==='object').sort();
+  const txDates = S.tx.map(x=>x.date);
+  const today = todayStr();
+  const all = [...snapKeys, ...txDates].sort();
+  if(!all.length) return [];
+  const start = all[0];
+  // hiệu ứng từng ngày lên "tiền chi tiêu" (noibo không đổi tổng)
+  const eff = {};
+  for(const x of S.tx){
+    let e = 0;
+    if(x.type==='chi') e = -x.amount;
+    else if(x.type==='thu') e = x.amount;
+    else if(x.type==='chuyen') e = (x.direction==='toBinance') ? -x.amount : x.amount;
+    else continue;
+    eff[x.date] = (eff[x.date]||0) + e;
+  }
+  // danh sách ngày từ start -> hôm nay (tối đa 120 ngày)
+  const days = [];
+  for(let d = new Date(today); ; d.setDate(d.getDate()-1)){
+    const ds = d.toISOString().slice(0,10);
+    days.push(ds);
+    if(ds <= start || days.length >= 120) break;
+  }
+  days.reverse();
+  // đi lùi từ số dư hiện tại để có tiền chi tiêu cuối mỗi ngày (chính xác theo giao dịch)
+  const b = balances();
+  let run = b.cash + b.tpbank;
+  const spendMap = {};
+  for(let i = days.length-1; i >= 0; i--){
+    spendMap[days[i]] = run;
+    run -= (eff[days[i]]||0);
+  }
+  // đầu tư: lấy theo snapshot giá gần nhất trước đó; hôm nay dùng giá trị hiện tại
+  const P = S.prices;
+  const curInvest = (S.qty.e1||0)*(P.e1||0) + (S.qty.voo||0)*(P.vooUSD||0)*(P.fx||0) + (S.qty.usdt||0)*(P.usdtVND||0) + (S.qty.usdc||0)*(P.usdcVND||0);
+  return days.map(ds=>{
+    let inv = null;
+    for(let i=snapKeys.length-1; i>=0; i--){ if(snapKeys[i] <= ds){ inv = h[snapKeys[i]].i; break; } }
+    if(inv===null) inv = snapKeys.length ? h[snapKeys[0]].i : curInvest;
+    if(ds === today) inv = curInvest;
+    const s = Math.round(spendMap[ds]), iv = Math.round(inv);
+    return {k:ds, s, i:iv, t:s+iv};
+  });
+}
+function renderHistory(){
   const listEl = document.getElementById('hist-list');
   const svg = document.getElementById('spark');
   const curEl = document.getElementById('hist-cur'), chEl = document.getElementById('hist-change');
-  const val = k => { const v=h[k]; return (typeof v==='number') ? {s:null, i:null, t:v} : {s:v.s, i:v.i, t:v.s+v.i}; };
-  if(!keysAll.length){
+  const series = buildDailySeries();
+  if(!series.length){
     curEl.textContent='—';
-    chEl.textContent='App tự ghi lại tài sản mỗi ngày sếp mở — vài ngày nữa biểu đồ sẽ hiện.';
+    chEl.textContent='Nhập giao dịch là biểu đồ tự dựng theo từng ngày.';
     listEl.innerHTML=''; svg.innerHTML=''; chartPts=[]; return;
   }
-  // header: tổng hiện tại + thay đổi so với hôm trước
-  const lastV = val(keysAll[keysAll.length-1]).t;
+  const lastV = series[series.length-1].t;
   curEl.textContent = fmt(lastV);
-  if(keysAll.length>1){
-    const prevV = val(keysAll[keysAll.length-2]).t;
+  if(series.length>1){
+    const prevV = series[series.length-2].t;
     const d = lastV-prevV, pc = prevV ? d/prevV*100 : 0;
     chEl.innerHTML = d>=0
       ? `<span class="green">▲ ${fmt(d)} (+${pc.toFixed(2)}%)</span> <span class="muted">so với ngày trước</span>`
       : `<span class="red">▼ ${fmt(-d)} (${pc.toFixed(2)}%)</span> <span class="muted">so với ngày trước</span>`;
   }else chEl.textContent = 'Cần thêm vài ngày dữ liệu để so sánh.';
 
-  // 2 đường riêng: chi tiêu (xanh lá) và đầu tư (xanh dương)
-  const range = histRange>0 ? keysAll.slice(-histRange) : keysAll;
-  const keys = range.filter(k=>val(k).s!==null);
-  chartKeys = keys; chartVals = keys.map(val); chartPts = [];
+  // 2 đường riêng: chi tiêu (xanh lá) và đầu tư (xanh dương), theo từng ngày
+  const view = histRange>0 ? series.slice(-histRange) : series;
+  const keys = view.map(v=>v.k);
+  chartKeys = keys; chartVals = view; chartPts = [];
   const W=320, H=150, padL=8, padR=54, padT=12, padB=20;
   let legend = '';
   if(keys.length){
@@ -891,17 +943,16 @@ function renderHistory(){
   }
   // danh sách 8 ngày gần nhất kèm tăng/giảm (theo tổng)
   const rows = [];
-  for(const k of keysAll.slice(-8).reverse()){
-    const idx = keysAll.indexOf(k);
-    const prev = idx>0 ? val(keysAll[idx-1]).t : null;
-    const tv = val(k).t;
+  for(let idx = series.length-1; idx >= Math.max(0, series.length-8); idx--){
+    const v = series[idx];
+    const prev = idx>0 ? series[idx-1].t : null;
     let ch = '<span class="muted">—</span>';
     if(prev!==null){
-      const d = tv-prev;
+      const d = v.t-prev;
       if(d>0) ch = `<span class="green">▲ ${fmt(d)}</span>`;
       else if(d<0) ch = `<span class="red">▼ ${fmt(-d)}</span>`;
     }
-    rows.push(`<div class="tx-item"><div>Ngày ${k.slice(8,10)}/${k.slice(5,7)}</div><div class="flex" style="flex-wrap:nowrap;gap:12px"><b>${fmt(tv)}</b>${ch}</div></div>`);
+    rows.push(`<div class="tx-item"><div>Ngày ${v.k.slice(8,10)}/${v.k.slice(5,7)}</div><div class="flex" style="flex-wrap:nowrap;gap:12px"><b>${fmt(v.t)}</b>${ch}</div></div>`);
   }
   listEl.innerHTML = legend + rows.join('');
 }
@@ -1024,7 +1075,7 @@ function addExpense(){
   document.getElementById('exp-amount').value=''; document.getElementById('exp-note').value='';
   render();
   const msg = `Đã trừ ${fmt(amount)} từ ${selSrc==='cash'?'tiền mặt':'TPBank'}`;
-  toast('✅ '+msg); speak('Dạ, em lưu xong rồi ạ!');
+  toast('✅ '+msg+' <span class="muted">· ☁️ tự sao lưu</span>'); speak('Dạ, em lưu xong rồi ạ!');
 }
 function addIncome(){
   const amount = parseMoney(document.getElementById('inc-amount').value);
@@ -1056,7 +1107,7 @@ function addATM(){
   const msg = dir==='ruttien'
     ? `Đã chuyển ${fmt(amount)} từ TPBank ra tiền mặt`
     : `Đã chuyển ${fmt(amount)} tiền mặt vào TPBank`;
-  toast('✅ '+msg); speak('Dạ, em lưu xong rồi ạ!');
+  toast('✅ '+msg+' <span class="muted">· ☁️ tự sao lưu</span>'); speak('Dạ, em lưu xong rồi ạ!');
 }
 function tfDirChanged(){
   const d = document.getElementById('tf-dir').value;
@@ -1097,7 +1148,7 @@ function addTransfer(){
   const msg = direction==='toBinance'
     ? `Đã trừ ${fmt(amount)} từ ${srcName}, chuyển vào Binance để đầu tư${usdtInfo}`
     : `Đã cộng ${fmt(amount)} vào ${srcName}, rút từ Binance về${usdtInfo}`;
-  toast('✅ '+msg); speak('Dạ, em lưu xong rồi ạ!');
+  toast('✅ '+msg+' <span class="muted">· ☁️ tự sao lưu</span>'); speak('Dạ, em lưu xong rồi ạ!');
 }
 function deleteTx(id){
   if(!confirm('Xóa giao dịch này? Số dư sẽ được hoàn lại.')) return;
@@ -1245,6 +1296,77 @@ function resetAll(){
   location.reload();
 }
 
+/* ================= KHÓA APP (PIN + Face ID) ================= */
+async function sha256(s){
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+const lockPinHash = ()=> localStorage.getItem('qlt-lock-pin') || '';
+const lockBioId = ()=> localStorage.getItem('qlt-lock-bio') || '';
+function lockStatus(m){ const el=document.getElementById('lock-status'); if(el) el.textContent = m; }
+async function enablePin(){
+  const pin = document.getElementById('set-pin').value.trim();
+  if(!/^\d{4,6}$/.test(pin)){ lockStatus('⚠️ PIN phải là 4–6 chữ số.'); return; }
+  localStorage.setItem('qlt-lock-pin', await sha256(pin));
+  document.getElementById('set-pin').value='';
+  lockStatus('✅ Đã bật khóa PIN — mỗi lần mở app sẽ hỏi mã.');
+  speak('Dạ, em bật khóa app rồi ạ!');
+}
+async function enableBio(){
+  if(!lockPinHash()){ lockStatus('⚠️ Bật PIN trước để dự phòng, rồi bật Face ID ạ.'); return; }
+  try{
+    const cred = await navigator.credentials.create({publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: {name:'Quan Ly Tai San'},
+      user: {id: crypto.getRandomValues(new Uint8Array(16)), name:'chu-tich-long', displayName:'Chủ Tịch Long'},
+      pubKeyCredParams: [{type:'public-key', alg:-7},{type:'public-key', alg:-257}],
+      authenticatorSelection: {authenticatorAttachment:'platform', userVerification:'required'},
+      timeout: 60000
+    }});
+    localStorage.setItem('qlt-lock-bio', btoa(String.fromCharCode(...new Uint8Array(cred.rawId))));
+    lockStatus('✅ Đã bật Face ID / vân tay.');
+    speak('Dạ, em bật Face ID rồi ạ!');
+  }catch(e){ lockStatus('❌ Không bật được ('+e.message+').'); }
+}
+function disableLock(){
+  localStorage.removeItem('qlt-lock-pin'); localStorage.removeItem('qlt-lock-bio');
+  lockStatus('Đã tắt khóa app.');
+}
+function showLock(){
+  if(!lockPinHash()) return;
+  document.getElementById('lock-screen').style.display='flex';
+  document.getElementById('lock-bio').style.display = lockBioId() ? 'block' : 'none';
+  if(lockBioId()) setTimeout(tryUnlockBio, 400); // tự mời Face ID luôn
+}
+function hideLock(){
+  document.getElementById('lock-screen').style.display='none';
+  document.getElementById('lock-pin').value='';
+  document.getElementById('lock-msg').textContent='';
+}
+async function tryUnlockPin(){
+  const pin = document.getElementById('lock-pin').value.trim();
+  if(pin && await sha256(pin) === lockPinHash()){ hideLock(); }
+  else{ document.getElementById('lock-msg').textContent='❌ Sai mã rồi ạ, sếp thử lại.'; document.getElementById('lock-pin').value=''; }
+}
+async function tryUnlockBio(){
+  if(!lockBioId()) return;
+  try{
+    const raw = Uint8Array.from(atob(lockBioId()), c=>c.charCodeAt(0));
+    await navigator.credentials.get({publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{type:'public-key', id: raw}],
+      userVerification: 'required', timeout: 60000
+    }});
+    hideLock();
+  }catch(e){ document.getElementById('lock-msg').textContent='Face ID chưa nhận — sếp nhập PIN nhé.'; }
+}
+// khóa lại nếu rời app quá 5 phút
+let lockLastHide = 0;
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='hidden') lockLastHide = Date.now();
+  else if(lockPinHash() && lockLastHide && Date.now()-lockLastHide > 5*60*1000) showLock();
+});
+
 /* ================= ĐIỀU KHIỂN GIỌNG NÓI ================= */
 let recog = null, listening = false;
 function toast(msg, ms=3500){
@@ -1302,11 +1424,6 @@ function updateVolBtn(){
   const ps = document.getElementById('pitch-slider'), pv = document.getElementById('pitch-val');
   if(ps) ps.value = Math.round(voicePitch*10);
   if(pv) pv.textContent = voicePitch.toFixed(1);
-}
-function toggleVolPanel(){
-  const p = document.getElementById('vol-panel');
-  p.style.display = p.style.display==='flex' ? 'none' : 'flex';
-  updateVolBtn();
 }
 function setVolume(val){
   voiceVol = Math.max(0, Math.min(1, val/100));
@@ -1438,7 +1555,7 @@ function guessCategory(text){
   const t = stripVN(text);
   for(const c of S.categories){ if(t.includes(stripVN(c))) return c; }
   for(const [cat, keys] of CAT_KEYS){ if(S.categories.includes(cat) && keys.some(k=>t.includes(k))) return cat; }
-  return S.categories.includes('Khác') ? 'Khác' : S.categories[0];
+  return null; // không đoán được -> hỏi lại sếp cho chính xác
 }
 function parseVoiceDate(t){
   const m = t.match(/ngay\s+(\d{1,2})\s+thang\s+(\d{1,2})(?:\s+nam\s+(\d{4}))?/)
@@ -1522,8 +1639,30 @@ function fillTransfer(direction, amount, source, date, rate, note){
   confirmFill((direction==='toBinance' ? `Đã điền nạp ${fmt(amount)} vào Binance để đầu tư` : `Đã điền rút ${fmt(amount)} từ Binance về ${source==='cash'?'tiền mặt':'TPBank'}`) + (rate?`, giá ${fmtN(rate)}`:''));
 }
 
+let pendingVoice = null; // câu hỏi làm rõ đang chờ sếp trả lời
 function handleVoice(text){
   const t = stripVN(text);
+  // ===== 0. ĐANG CHỜ SẾP TRẢ LỜI CÂU HỎI LÀM RÕ =====
+  if(pendingVoice){
+    const p = pendingVoice; pendingVoice = null;
+    if(/^(thoi|huy|bo qua|khong can|dung lai)/.test(t)){ toast('🤖 Dạ, em hủy rồi ạ.'); speak('Dạ, em hủy rồi ạ'); return; }
+    if(p.need==='amount'){
+      const amt = parseAmountVN(t);
+      if(amt){ fillExpense(amt, p.category, p.source, p.date, p.note); return; }
+      pendingVoice = p;
+      toast('🤖 Em chưa nghe ra số tiền, sếp nói lại giúp em ạ (VD: "45 nghìn"). Nói "thôi" để hủy.', 6000);
+      speak('Em chưa nghe ra số tiền, sếp nói lại giúp em ạ'); return;
+    }
+    if(p.need==='category'){
+      let cat = null;
+      for(const c of S.categories){ if(t.includes(stripVN(c))){ cat=c; break; } }
+      if(!cat) cat = guessCategory(t);
+      if(cat){ fillExpense(p.amount, cat, p.source, p.date, p.note); return; }
+      pendingVoice = p;
+      toast('🤖 Em chưa nhận ra danh mục, sếp nói tên danh mục giúp em ạ ('+S.categories.join(', ')+'). Nói "thôi" để hủy.', 7000);
+      speak('Em chưa nhận ra danh mục, sếp nói lại giúp em ạ'); return;
+    }
+  }
   // ===== 1. ĐÓNG APP =====
   if(/(dong app|tat app|dong ung dung|toi day thoi|den day thoi|hom nay du roi|toi xong roi|(oke|ok|duoc) roi.*(dong|xong|nghi)|xong roi.*(dong|nghi)|tam biet)/.test(t)){
     speak('Dạ, em lưu xong hết rồi ạ! Em chào sếp Long, sếp nghỉ ngơi vui vẻ nha!');
@@ -1544,20 +1683,74 @@ function handleVoice(text){
     const msg = `Dạ thưa sếp, tổng tài sản của sếp là ${fmt(spend+invest)} ạ. Trong đó tiền chi tiêu ${fmt(spend)}, tiền đầu tư ${fmt(invest)} ạ.`;
     toast('🤖 '+msg); speak(msg); return;
   }
-  if(t.includes('hom nay') && /(tieu|chi|het bao nhieu)/.test(t) && !parseAmountVN(cleanCore(t))){
-    let s=0; for(const x of S.tx) if(x.type==='chi' && x.date===todayStr()) s+=x.amount;
-    const msg = s>0 ? `Dạ hôm nay sếp đã chi ${fmt(s)} rồi ạ.` : 'Dạ hôm nay sếp chưa chi khoản nào luôn, sếp tiết kiệm ghê á!';
-    toast('🤖 '+msg); speak(msg); return;
+  // "dự báo tháng này" -> đọc dự báo chi tiêu
+  if(/(du bao|du doan|cuoi thang.*(chi|tieu|het))/.test(t)){
+    const day = parseInt(todayStr().slice(8,10),10);
+    const thisM = monthChi(ymOffset(0));
+    if(thisM<=0 || day<3){ const m='Dạ, tháng này chưa đủ dữ liệu để dự báo ạ.'; toast('🤖 '+m); speak(m); return; }
+    const fc = thisM/day*30, last = monthChi(ymOffset(-1));
+    let cmp = '';
+    if(last>0){ const pc = Math.round((fc/last-1)*100); cmp = pc>0 ? `, cao hơn tháng trước ${pc} phần trăm` : `, thấp hơn tháng trước ${-pc} phần trăm`; }
+    const m = `Dạ, tháng này sếp đã chi ${fmt(thisM)}. Theo đà này cả tháng sẽ khoảng ${fmt(fc)}${cmp} ạ.`;
+    toast('🤖 '+m, 7000); speak(m); return;
   }
-  if(t.includes('thang nay') && /(tieu|chi|het bao nhieu)/.test(t) && !parseAmountVN(cleanCore(t))){
-    const msg = `Dạ tháng này sếp đã chi tổng cộng ${fmt(monthChi(ymOffset(0)))} ạ.`;
-    toast('🤖 '+msg); speak(msg); return;
+  // ===== HỎI CHI TIÊU THEO NGÀY / THÁNG / DANH MỤC (trả lời chính xác từ dữ liệu) =====
+  const qClean = cleanCore(t).replace(/ngay\s+\d{1,2}/g,' ').replace(/thang\s+\d{1,2}/g,' ');
+  if(/(chi|tieu|xai|het)/.test(t) && /bao nhieu/.test(t) && !parseAmountVN(qClean)){
+    const today = todayStr(), ym = today.slice(0,7);
+    let from=null, to=null, label='';
+    if(t.includes('hom nay')){ from=to=today; label='hôm nay'; }
+    else if(t.includes('hom qua')){ const d=new Date(new Date(today)-86400000).toISOString().slice(0,10); from=to=d; label='hôm qua'; }
+    else if(/tuan nay|7 ngay/.test(t)){ from=new Date(new Date(today)-6*86400000).toISOString().slice(0,10); to=today; label='7 ngày gần đây'; }
+    else if(t.includes('thang nay')){ from=ym+'-01'; to=today; label='tháng này'; }
+    else if(t.includes('thang truoc')){ const d=new Date(today); d.setDate(1); d.setMonth(d.getMonth()-1); const pm=d.toISOString().slice(0,7); from=pm+'-01'; to=pm+'-31'; label='tháng trước'; }
+    else if(/ngay\s+\d/.test(t)){
+      let ds = parseVoiceDate(t);
+      if(!ds){ // "ngày 15" không kèm tháng -> hiểu là tháng hiện tại (nếu chưa tới thì tháng trước)
+        const mD = t.match(/ngay\s+(\d{1,2})/);
+        const dd = String(parseInt(mD[1],10)).padStart(2,'0');
+        ds = ym+'-'+dd;
+        if(ds > today){ const d=new Date(today); d.setDate(1); d.setMonth(d.getMonth()-1); ds = d.toISOString().slice(0,7)+'-'+dd; }
+      }
+      from=to=ds; label='ngày '+ds.slice(8,10)+'/'+ds.slice(5,7);
+    }
+    else{
+      const mM = t.match(/thang\s+(\d{1,2})/);
+      if(mM){
+        let mm=parseInt(mM[1],10), y=parseInt(ym.slice(0,4),10);
+        if(mm>parseInt(ym.slice(5,7),10)) y--;
+        const mmS=String(mm).padStart(2,'0');
+        from=`${y}-${mmS}-01`; to=`${y}-${mmS}-31`; label=`tháng ${mm}/${y}`;
+      }
+    }
+    if(!from){ from=to=today; label='hôm nay'; }
+    let cat=''; for(const c of S.categories){ if(t.includes(stripVN(c))){ cat=c; break; } }
+    const list = S.tx.filter(x=>x.type==='chi' && x.date>=from && x.date<=to && (!cat || x.category===cat));
+    const total = list.reduce((a,x)=>a+x.amount,0);
+    let msg;
+    if(total>0){
+      msg = `Dạ, ${label}${cat?' sếp chi cho '+cat:''} hết ${fmt(total)}, gồm ${list.length} khoản ạ.`;
+      if(!cat && list.length>1){
+        const byCat={}; for(const x of list) byCat[x.category]=(byCat[x.category]||0)+x.amount;
+        const top = Object.entries(byCat).sort((a,b)=>b[1]-a[1])[0];
+        msg += ` Nhiều nhất là ${top[0]}: ${fmt(top[1])}.`;
+      }
+    }else{
+      msg = `Dạ, ${label}${cat?' mục '+cat:''} sếp chưa chi khoản nào ạ.`;
+    }
+    toast('🤖 '+msg, 7000); speak(msg);
+    return;
   }
   if(/(cap nhat gia|lam moi gia|update gia|gia moi nhat)/.test(t)){ refreshPrices(true); toast('🔄 Đang cập nhật giá...'); speak('Dạ, em đang cập nhật giá cho sếp ạ'); return; }
+  if(/(khoa app|khoa man hinh|khoa lai)/.test(t)){
+    if(lockPinHash()){ speak('Dạ, em khóa app lại ạ!'); showLock(); }
+    else { toast('🤖 Sếp chưa đặt mã PIN — vào Cài đặt → Khóa app để bật trước ạ.'); speak('Sếp chưa đặt mã khóa ạ'); }
+    return;
+  }
   if(/sao luu/.test(t)){ document.querySelectorAll('.tabs button')[3].click(); cloudBackup(); return; }
   if(/(tai|lay|keo) du lieu/.test(t)){ document.querySelectorAll('.tabs button')[3].click(); cloudDownload(); return; }
   // BỘ LỌC bằng giọng nói: "lọc ăn uống từ ngày 1 đến ngày 15", "lọc chi tiêu tháng này"
-  if(t.includes('loc') && (/tu ngay|den ngay|toi ngay|thang nay/.test(t) || S.categories.some(c=>t.includes(stripVN(c))))){
+  if(t.includes('loc') && (/tu ngay|den ngay|toi ngay|thang nay|thang \d/.test(t) || S.categories.some(c=>t.includes(stripVN(c))))){
     const ym = todayStr().slice(0,7);
     const pd = m => {
       if(!m) return null;
@@ -1567,11 +1760,21 @@ function handleVoice(text){
     };
     const mF = t.match(/tu ngay\s+(\d{1,2})(?:\s*[\/\-]\s*(\d{1,2})|\s+thang\s+(\d{1,2}))?/);
     const mT = t.match(/(?:den|toi) ngay\s+(\d{1,2})(?:\s*[\/\-]\s*(\d{1,2})|\s+thang\s+(\d{1,2}))?/);
-    const from = pd(mF) || ym+'-01';
-    const to = pd(mT) || todayStr();
+    let from = pd(mF) || ym+'-01';
+    let to = pd(mT) || todayStr();
+    // "lọc chi tiêu tháng 6" -> lọc trọn tháng đó + mở luôn báo cáo tháng đó
+    const mM = t.match(/thang\s+(\d{1,2})/);
+    if(mM && !mF && !mT && !t.includes('thang nay')){
+      let mm = parseInt(mM[1],10), y = parseInt(ym.slice(0,4),10);
+      if(mm > parseInt(ym.slice(5,7),10)) y--;
+      const mmS = String(mm).padStart(2,'0');
+      from = `${y}-${mmS}-01`; to = `${y}-${mmS}-31`;
+      document.getElementById('report-month').value = `${y}-${mmS}`;
+    }
     let cat = '';
     for(const c of S.categories){ if(t.includes(stripVN(c))){ cat = c; break; } }
     document.querySelectorAll('.tabs button')[2].click();
+    renderReport();
     document.getElementById('flt-from').value = from;
     document.getElementById('flt-to').value = to;
     renderCatList();
@@ -1581,15 +1784,41 @@ function handleVoice(text){
     return;
   }
 
+  // "báo cáo tháng 6" (không có chữ lọc) -> mở báo cáo đúng tháng đó
+  const mBC = t.match(/bao cao[^]*?thang\s+(\d{1,2})/) || t.match(/thang\s+(\d{1,2})[^]*?bao cao/);
+  if(mBC && !t.includes('loc')){
+    const ym = todayStr().slice(0,7);
+    let mm = parseInt(mBC[1],10), y = parseInt(ym.slice(0,4),10);
+    if(mm > parseInt(ym.slice(5,7),10)) y--;
+    document.querySelectorAll('.tabs button')[2].click();
+    document.getElementById('report-month').value = `${y}-${String(mm).padStart(2,'0')}`;
+    renderReport();
+    setTimeout(()=>document.getElementById('report-month').scrollIntoView({behavior:'smooth', block:'center'}), 250);
+    const msg = `Dạ, em mở báo cáo tháng ${mm} cho sếp rồi ạ!`;
+    toast('📊 '+msg); speak(msg);
+    return;
+  }
+
   // ===== 3. PHÂN TÍCH GIAO DỊCH =====
   const date = parseVoiceDate(t) || todayStr();
   const note = extractNote(text);
   const rate = parseRate(t);
   const core = cleanCore(t);
   const amount = parseAmountVN(core);
+  const source = /(ngan hang|tp ?bank|chuyen khoan|the ngan hang|bang the|tai khoan)/.test(core) ? 'tpbank' : 'cash';
 
-  // ===== 4. KHÔNG CÓ SỐ TIỀN -> ĐIỀU HƯỚNG =====
+  // ===== 4. KHÔNG CÓ SỐ TIỀN =====
   if(!amount){
+    // có ý định chi + có danh mục nhưng thiếu số tiền -> hỏi lại cho chính xác
+    let catAsk = null;
+    for(const c of S.categories){ if(t.includes(stripVN(c))){ catAsk=c; break; } }
+    if(!catAsk) catAsk = guessCategory(core);
+    if(catAsk && /(chi|mua|tra tien|thanh toan|an |uong |dong tien)/.test(core)){
+      pendingVoice = {need:'amount', category:catAsk, source, date, note};
+      const q = `Dạ, khoản ${catAsk} này hết bao nhiêu tiền ạ?`;
+      toast('🤖 '+q+' (bấm 🎤 nói số tiền, hoặc "thôi" để hủy)', 8000); speak(q);
+      return;
+    }
     const NAV = [
       [/bao cao|thong ke|tong ket thang/, 2, 'report-month', '📊 Đã mở Báo cáo tháng'],
       [/bien dong|bieu do|do thi|chart/, 2, 'hist-cur', '📈 Đã mở Biến động tài sản'],
@@ -1611,7 +1840,6 @@ function handleVoice(text){
   }
 
   // ===== 5. CÓ SỐ TIỀN -> XÁC ĐỊNH LOẠI GIAO DỊCH, ĐIỀN SẴN CHỜ XÁC NHẬN =====
-  const source = /(ngan hang|tp ?bank|chuyen khoan|the ngan hang|bang the|tai khoan)/.test(core) ? 'tpbank' : 'cash';
   // 5a. Rút từ Binance về (bán USDT/USDC, rút về ngân hàng)
   if( (/(rut|ban|chuyen)/.test(core) && /(binance|usdt|usdc)/.test(core)) ||
       (/rut/.test(core) && /ve (ngan hang|tai khoan|bank|tp ?bank)/.test(core)) ){
@@ -1633,8 +1861,15 @@ function handleVoice(text){
   if( /(nhan luong|nhan tien|luong ve|thu nhap|duoc cho|duoc thuong|nap tien vao vi|co them)/.test(core) ){
     fillIncome(amount, source, note || text); return;
   }
-  // 5f. Mặc định: khoản chi
-  fillExpense(amount, guessCategory(core+' '+stripVN(note)), source, date, note);
+  // 5f. Mặc định: khoản chi — nếu không chắc danh mục thì hỏi lại
+  const gcat = guessCategory(core+' '+stripVN(note));
+  if(!gcat){
+    pendingVoice = {need:'category', amount, source, date, note};
+    const q = `Dạ, khoản ${fmt(amount)} này thuộc danh mục nào ạ?`;
+    toast('🤖 '+q+' (bấm 🎤 nói: '+S.categories.join(' / ')+', hoặc "thôi" để hủy)', 9000); speak(q);
+    return;
+  }
+  fillExpense(amount, gcat, source, date, note);
 }
 function startVoice(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1678,6 +1913,9 @@ document.getElementById('exp-date').value = todayStr();
 document.getElementById('tf-date').value = todayStr();
 document.getElementById('atm-date').value = todayStr();
 selectSource('cash');
+// khóa app nếu đã bật
+if(window.PublicKeyCredential){ const bb = document.getElementById('btn-bio'); if(bb) bb.style.display='inline-block'; }
+showLock();
 // tương tác biểu đồ biến động
 const sparkEl = document.getElementById('spark');
 sparkEl.addEventListener('mousemove', e=>chartMove(e.clientX));
