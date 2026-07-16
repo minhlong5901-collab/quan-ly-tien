@@ -320,7 +320,15 @@
       <div id="rp-cats"></div>
       <h3>Chi tiết giao dịch</h3>
       <div id="rp-list"></div>
-      <div style="margin-top:12px"><button class="ghost" onclick="exportCSV()">⬇️ Xuất CSV tháng này</button></div>
+      <h3>🔍 Bộ lọc chi tiêu</h3>
+      <div class="grid2">
+        <div><label>Từ ngày</label><input type="date" id="flt-from"></div>
+        <div><label>Đến ngày</label><input type="date" id="flt-to"></div>
+      </div>
+      <label>Danh mục</label>
+      <select id="flt-cat"><option value="">Tất cả danh mục</option></select>
+      <div style="margin-top:12px"><button onclick="runFilter()" style="width:100%">Lọc chi tiêu</button></div>
+      <div id="flt-result" style="margin-top:10px"></div>
     </div>
   </div>
 
@@ -1074,16 +1082,36 @@ function renderReport(){
     </div>`).join('') : '<div class="muted" style="font-size:13px">Chưa có khoản chi trong tháng này.</div>';
   document.getElementById('rp-list').innerHTML = list.length ? list.map(txRow).join('') : '<div class="muted" style="font-size:13px">Không có giao dịch.</div>';
 }
-function exportCSV(){
-  const m = document.getElementById('report-month').value;
-  const list = S.tx.filter(x=>x.date.startsWith(m)).sort((a,b)=>a.date.localeCompare(b.date));
-  if(!list.length){ alert('Không có giao dịch trong tháng này.'); return; }
-  let csv = '﻿Ngày,Loại,Danh mục,Số tiền (VND),Nguồn,Giá USDT,Số USDT,Ghi chú\n';
-  for(const x of list){
-    const loai = x.type==='chi' ? 'Chi' : x.type==='thu' ? 'Thu' : x.type==='noibo' ? 'Chuyển nội bộ' : (x.direction==='toBinance' ? 'Nạp Binance' : 'Rút Binance');
-    csv += `${x.date},${loai},${x.category},${x.amount},${x.source==='cash'?'Tiền mặt':'TPBank'},${x.rate||''},${x.usdt||''},"${(x.note||'').replace(/"/g,'""')}"\n`;
+function runFilter(speakOut=false){
+  const from = document.getElementById('flt-from').value;
+  const to = document.getElementById('flt-to').value;
+  const cat = document.getElementById('flt-cat').value;
+  const el = document.getElementById('flt-result');
+  if(!from || !to){ toast('Sếp chọn đủ "Từ ngày" và "Đến ngày" nha!'); return; }
+  if(from > to){ toast('"Từ ngày" phải trước "Đến ngày" nha sếp!'); return; }
+  const list = S.tx.filter(x=>x.type==='chi' && x.date>=from && x.date<=to && (!cat || x.category===cat))
+                   .sort((a,b)=> b.date.localeCompare(a.date) || b.id-a.id);
+  const total = list.reduce((a,x)=>a+x.amount,0);
+  const dd = d=>d.slice(8,10)+'/'+d.slice(5,7);
+  let breakdown = '';
+  if(!cat && list.length){
+    const byCat = {};
+    for(const x of list) byCat[x.category]=(byCat[x.category]||0)+x.amount;
+    breakdown = '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">'
+      + Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>
+        `<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>${c}</span><b>${fmt(v)}</b></div>`).join('')
+      + '</div>';
   }
-  downloadFile(csv, `chi-tieu-${m}.csv`, 'text/csv');
+  el.innerHTML = `
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px">
+      <div class="detail muted">${dd(from)} → ${dd(to)}${cat ? ' · '+cat : ' · tất cả danh mục'} · ${list.length} giao dịch</div>
+      <div style="font-size:22px;font-weight:800" class="red">${fmt(total)}</div>
+      ${breakdown}
+    </div>` + (list.length ? list.map(txRow).join('') : '<div class="muted" style="font-size:13px;margin-top:8px">Không có khoản chi nào trong khoảng này.</div>');
+  if(speakOut){
+    speak(cat ? `Dạ, từ ${dd(from)} đến ${dd(to)}, sếp đã chi ${fmt(total)} cho ${cat} ạ`
+              : `Dạ, từ ${dd(from)} đến ${dd(to)}, sếp đã chi tổng cộng ${fmt(total)} ạ`);
+  }
 }
 
 /* ================= CÀI ĐẶT ================= */
@@ -1115,6 +1143,11 @@ function saveSettings(){
 function renderCatList(){
   document.getElementById('cat-list').innerHTML = S.categories.map(c=>
     `<span class="tag">${c} <span style="cursor:pointer;color:var(--red)" onclick="removeCategory('${c.replace(/'/g,"\\'")}')">✕</span></span>`).join('');
+  const sel = document.getElementById('flt-cat');
+  if(sel){
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Tất cả danh mục</option>' + S.categories.map(c=>`<option ${c===cur?'selected':''}>${c}</option>`).join('');
+  }
 }
 function addCategory(){
   const v = document.getElementById('new-cat').value.trim();
@@ -1398,6 +1431,30 @@ function handleVoice(text){
     toast('🤖 '+msg); speak(msg); return;
   }
   if(/(cap nhat gia|lam moi gia|update gia|gia moi nhat)/.test(t)){ refreshPrices(true); toast('🔄 Đang cập nhật giá...'); speak('Dạ, em đang cập nhật giá cho sếp ạ'); return; }
+  // BỘ LỌC bằng giọng nói: "lọc ăn uống từ ngày 1 đến ngày 15", "lọc chi tiêu tháng này"
+  if(t.includes('loc') && (/tu ngay|den ngay|toi ngay|thang nay/.test(t) || S.categories.some(c=>t.includes(stripVN(c))))){
+    const ym = todayStr().slice(0,7);
+    const pd = m => {
+      if(!m) return null;
+      const dd = String(parseInt(m[1],10)).padStart(2,'0');
+      const mm = (m[2]||m[3]) ? String(parseInt(m[2]||m[3],10)).padStart(2,'0') : ym.slice(5,7);
+      return `${ym.slice(0,4)}-${mm}-${dd}`;
+    };
+    const mF = t.match(/tu ngay\s+(\d{1,2})(?:\s*[\/\-]\s*(\d{1,2})|\s+thang\s+(\d{1,2}))?/);
+    const mT = t.match(/(?:den|toi) ngay\s+(\d{1,2})(?:\s*[\/\-]\s*(\d{1,2})|\s+thang\s+(\d{1,2}))?/);
+    const from = pd(mF) || ym+'-01';
+    const to = pd(mT) || todayStr();
+    let cat = '';
+    for(const c of S.categories){ if(t.includes(stripVN(c))){ cat = c; break; } }
+    document.querySelectorAll('.tabs button')[2].click();
+    document.getElementById('flt-from').value = from;
+    document.getElementById('flt-to').value = to;
+    renderCatList();
+    document.getElementById('flt-cat').value = cat;
+    runFilter(true);
+    setTimeout(()=>document.getElementById('flt-result').scrollIntoView({behavior:'smooth', block:'center'}), 300);
+    return;
+  }
 
   // ===== 3. PHÂN TÍCH GIAO DỊCH =====
   const date = parseVoiceDate(t) || todayStr();
@@ -1479,7 +1536,14 @@ function showPage(p, btn){
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
   btn.classList.add('active');
-  if(p==='report'){ if(!document.getElementById('report-month').value) document.getElementById('report-month').value = todayStr().slice(0,7); renderReport(); }
+  if(p==='report'){
+    if(!document.getElementById('report-month').value) document.getElementById('report-month').value = todayStr().slice(0,7);
+    if(!document.getElementById('flt-from').value){
+      document.getElementById('flt-from').value = todayStr().slice(0,8)+'01'; // đầu tháng
+      document.getElementById('flt-to').value = todayStr();
+    }
+    renderReport();
+  }
   window.scrollTo(0,0);
 }
 
