@@ -136,7 +136,7 @@
         </div>
       </div>
       <div class="flex" style="margin-top:14px">
-        <button onclick="refreshPrices()" id="btn-refresh">🔄 Cập nhật giá</button>
+        <button onclick="refreshPrices(true)" id="btn-refresh">🔄 Cập nhật giá</button>
         <span class="status" id="price-status"></span>
       </div>
     </div>
@@ -354,18 +354,6 @@
         <button class="danger small" onclick="cloudDisconnect()">Ngắt</button>
       </div>
       <div class="status" id="cloud-status"></div>
-    </div>
-
-    <div class="card">
-      <h2>✏️ Giá thủ công (khi mạng lỗi)</h2>
-      <div class="detail muted" style="margin-bottom:8px">Nếu không tự lấy được giá, bạn có thể nhập tay tại đây.</div>
-      <label>Giá E1VFVN30 (VND / ccq)</label>
-      <input type="number" id="man-e1" step="any" placeholder="VD: 21500">
-      <label>Giá VOO (USD / cổ phiếu)</label>
-      <input type="number" id="man-voo" step="any" placeholder="VD: 620.5">
-      <label>Tỷ giá USD/VND</label>
-      <input type="number" id="man-fx" step="any" placeholder="VD: 26200">
-      <div style="margin-top:14px"><button class="ghost" onclick="saveManualPrices()">Lưu giá thủ công</button></div>
     </div>
 
     <div class="card">
@@ -634,7 +622,7 @@ function cloudDisconnect(){
 }
 
 /* (Đã bỏ kết nối Binance API — số lượng USDT/USDC/VOO nhập tay ở tab Cài đặt) */
-async function refreshPrices(){
+async function refreshPrices(announce=false){
   const btn = document.getElementById('btn-refresh');
   const st = document.getElementById('price-status');
   btn.disabled = true; st.textContent = 'Đang cập nhật giá...';
@@ -646,10 +634,10 @@ async function refreshPrices(){
   else results.push('⚠️ Tỷ giá lỗi' + (S.prices.fx ? ' (dùng giá cũ)' : ''));
 
   if(voo.status==='fulfilled'){ S.prices.vooUSD = voo.value; results.push('✅ VOO'); }
-  else results.push('⚠️ VOO lỗi' + (S.prices.vooUSD ? ' (dùng giá cũ)' : ' — nhập tay ở Cài đặt'));
+  else results.push('⚠️ VOO lỗi' + (S.prices.vooUSD ? ' (dùng giá cũ)' : ' — sẽ thử lại sau'));
 
   if(e1.status==='fulfilled'){ S.prices.e1 = e1.value; results.push('✅ E1VFVN30'); }
-  else results.push('⚠️ E1VFVN30 lỗi' + (S.prices.e1 ? ' (dùng giá cũ)' : ' — nhập tay ở Cài đặt'));
+  else results.push('⚠️ E1VFVN30 lỗi' + (S.prices.e1 ? ' (dùng giá cũ)' : ' — sẽ thử lại sau'));
 
   if(crypto.status==='fulfilled' && crypto.value){
     S.prices.usdtVND = crypto.value.usdt; S.prices.usdcVND = crypto.value.usdc;
@@ -663,6 +651,7 @@ async function refreshPrices(){
   save(); render();
   st.textContent = results.join('  ·  ');
   btn.disabled = false;
+  if(announce) speak('Đã cập nhật giá xong ạ');
 }
 
 /* ================= CƠ CẤU + KHUYẾN NGHỊ + LỊCH SỬ ================= */
@@ -945,7 +934,8 @@ function addExpense(){
   save();
   document.getElementById('exp-amount').value=''; document.getElementById('exp-note').value='';
   render();
-  alert(`Đã trừ ${fmt(amount)} từ ${selSrc==='cash'?'Tiền mặt':'TPBank'}`);
+  const msg = `Đã trừ ${fmt(amount)} từ ${selSrc==='cash'?'tiền mặt':'TPBank'}`;
+  toast('✅ '+msg); speak(msg);
 }
 function addIncome(){
   const amount = parseMoney(document.getElementById('inc-amount').value);
@@ -956,7 +946,8 @@ function addIncome(){
   save();
   document.getElementById('inc-amount').value=''; document.getElementById('inc-note').value='';
   render();
-  alert(`Đã cộng ${fmt(amount)} vào ${source==='cash'?'Tiền mặt':'TPBank'}`);
+  const msg = `Đã cộng ${fmt(amount)} vào ${source==='cash'?'tiền mặt':'TPBank'}`;
+  toast('✅ '+msg); speak(msg);
 }
 function addATM(){
   const amount = parseMoney(document.getElementById('atm-amount').value);
@@ -973,9 +964,10 @@ function addATM(){
   save();
   document.getElementById('atm-amount').value=''; document.getElementById('atm-note').value='';
   render();
-  alert(dir==='ruttien'
-    ? `Đã chuyển ${fmt(amount)}: TPBank → Tiền mặt`
-    : `Đã chuyển ${fmt(amount)}: Tiền mặt → TPBank`);
+  const msg = dir==='ruttien'
+    ? `Đã chuyển ${fmt(amount)} từ TPBank ra tiền mặt`
+    : `Đã chuyển ${fmt(amount)} tiền mặt vào TPBank`;
+  toast('✅ '+msg); speak(msg);
 }
 function tfDirChanged(){
   const d = document.getElementById('tf-dir').value;
@@ -1013,9 +1005,10 @@ function addTransfer(){
   render();
   const srcName = source==='cash' ? 'Tiền mặt' : 'TPBank';
   const usdtInfo = tx.usdt ? ` (≈ ${tx.usdt} USDT @ ${fmtN(rate)})` : '';
-  alert(direction==='toBinance'
-    ? `Đã trừ ${fmt(amount)} từ ${srcName} — chuyển vào Binance để đầu tư${usdtInfo}`
-    : `Đã cộng ${fmt(amount)} vào ${srcName} — rút từ Binance về${usdtInfo}`);
+  const msg = direction==='toBinance'
+    ? `Đã trừ ${fmt(amount)} từ ${srcName}, chuyển vào Binance để đầu tư${usdtInfo}`
+    : `Đã cộng ${fmt(amount)} vào ${srcName}, rút từ Binance về${usdtInfo}`;
+  toast('✅ '+msg); speak(msg.replace(/\(≈.*\)/,''));
 }
 function deleteTx(id){
   if(!confirm('Xóa giao dịch này? Số dư sẽ được hoàn lại.')) return;
@@ -1072,9 +1065,6 @@ function fillSettings(){
     document.getElementById('gh-token').value = S.cloud.token;
     if(S.cloud.gistId && S.cloud.lastSync) cloudStatus('✅ Đang đồng bộ đám mây · lần cuối '+timeAgo(S.cloud.lastSync));
   }
-  document.getElementById('man-e1').value = S.prices.e1||'';
-  document.getElementById('man-voo').value = S.prices.vooUSD||'';
-  document.getElementById('man-fx').value = S.prices.fx ? Math.round(S.prices.fx) : '';
 }
 function saveSettings(){
   // Đặt lại số dư hiện tại: opening = giá trị nhập, mốc = bây giờ
@@ -1087,17 +1077,6 @@ function saveSettings(){
   S.qty.usdc = parseFloat(document.getElementById('set-usdc').value)||0;
   save(); render();
   alert('Đã lưu số dư!');
-}
-function saveManualPrices(){
-  const e1 = parseFloat(document.getElementById('man-e1').value);
-  const voo = parseFloat(document.getElementById('man-voo').value);
-  const fx = parseFloat(document.getElementById('man-fx').value);
-  if(e1) S.prices.e1 = e1;
-  if(voo) S.prices.vooUSD = voo;
-  if(fx){ S.prices.fx = fx; if(!S.prices.usdtVND) S.prices.usdtVND = fx; if(!S.prices.usdcVND) S.prices.usdcVND = fx; }
-  S.prices.updated = new Date().toISOString();
-  save(); render();
-  alert('Đã lưu giá thủ công!');
 }
 function renderCatList(){
   document.getElementById('cat-list').innerHTML = S.categories.map(c=>
@@ -1155,8 +1134,27 @@ function toast(msg, ms=3500){
   el.innerHTML = msg; el.style.display='block';
   clearTimeout(el._t); el._t = setTimeout(()=>el.style.display='none', ms);
 }
+// chọn giọng đọc tiếng Việt tốt nhất có trên máy
+let viVoice = null;
+function pickVoice(){
+  try{
+    const vs = speechSynthesis.getVoices();
+    viVoice = vs.find(v=>v.lang==='vi-VN' && /female|nu|linh|hoai|my/i.test(v.name))
+           || vs.find(v=>v.lang==='vi-VN')
+           || vs.find(v=>v.lang && v.lang.toLowerCase().startsWith('vi'))
+           || null;
+  }catch(e){}
+}
+if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 function speak(text){
-  try{ const u = new SpeechSynthesisUtterance(text); u.lang='vi-VN'; u.rate=1.05; speechSynthesis.speak(u); }catch(e){}
+  try{
+    speechSynthesis.cancel(); // không nói chồng câu
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'vi-VN';
+    if(viVoice) u.voice = viVoice;
+    u.rate = 1.02; u.pitch = 1.05;
+    speechSynthesis.speak(u);
+  }catch(e){}
 }
 function stripVN(s){ return s.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'d').toLowerCase(); }
 function parseAmountVN(text){
@@ -1290,7 +1288,7 @@ function handleVoice(text){
     const msg = `Tháng này Chủ Tịch đã chi tổng cộng ${fmt(monthChi(ymOffset(0)))}.`;
     toast('🤖 '+msg); speak(msg); return;
   }
-  if(/(cap nhat gia|lam moi gia|update gia|gia moi nhat)/.test(t)){ refreshPrices(); toast('🔄 Đang cập nhật giá...'); speak('Đang cập nhật giá ạ'); return; }
+  if(/(cap nhat gia|lam moi gia|update gia|gia moi nhat)/.test(t)){ refreshPrices(true); toast('🔄 Đang cập nhật giá...'); speak('Đang cập nhật giá ạ'); return; }
 
   // ===== 3. PHÂN TÍCH GIAO DỊCH =====
   const date = parseVoiceDate(t) || todayStr();
@@ -1309,7 +1307,6 @@ function handleVoice(text){
       [/dong bo|dam may/, 3, 'gh-token', '☁️ Đã mở Đồng bộ đám mây'],
       [/sao luu|backup/, 3, 'card-backup', '💾 Đã mở Sao lưu'],
       [/danh muc/, 3, 'new-cat', '🗂️ Đã mở Danh mục chi tiêu'],
-      [/gia thu cong|nhap gia/, 3, 'man-e1', '✏️ Đã mở Giá thủ công'],
       [/cai dat|thiet lap|so du|so luong/, 3, 'set-cash', '⚙️ Đã mở Cài đặt'],
       [/binance/, 1, 'tf-dir', '🔁 Đã mở Chuyển tiền Binance'],
       [/rut tien|atm|nop tien/, 1, 'atm-dir', '🏧 Đã mở Rút / nộp tiền mặt'],
