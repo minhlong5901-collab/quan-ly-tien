@@ -363,11 +363,35 @@
       <label>GitHub Token</label>
       <input type="password" id="gh-token" placeholder="ghp_..." autocomplete="off">
       <div class="flex" style="margin-top:12px">
-        <button onclick="cloudConnect()">Kết nối & đồng bộ</button>
-        <button class="ghost" onclick="cloudSyncNow()">🔄 Đồng bộ ngay</button>
+        <button class="ghost" onclick="cloudConnect()">🔗 Kết nối (lần đầu)</button>
         <button class="danger small" onclick="cloudDisconnect()">Ngắt</button>
       </div>
+      <div class="grid2" style="margin-top:10px">
+        <button onclick="cloudDownload()">⬇️ Tải dữ liệu đã lưu</button>
+        <button onclick="cloudBackup()">⬆️ Sao lưu ngay</button>
+      </div>
       <div class="status" id="cloud-status"></div>
+    </div>
+
+    <div class="card">
+      <h2>🗣️ Giọng AI ElevenLabs (siêu mượt, tùy chọn)</h2>
+      <div class="detail muted" style="margin-bottom:8px">
+        Giọng AI mượt như người thật, vượt giới hạn giọng của iPhone. Tạo tài khoản miễn phí tại <b>elevenlabs.io</b>
+        → biểu tượng tài khoản → <b>API Keys</b> → Create Key → dán vào đây. Key chỉ lưu trên máy này, không đồng bộ đi đâu.
+      </div>
+      <label>API Key</label>
+      <input type="password" id="el-key" placeholder="sk_..." autocomplete="off">
+      <label>Chọn giọng</label>
+      <div class="flex">
+        <select id="el-voice" style="flex:1"><option value="">— Dán key rồi bấm "Tải giọng" —</option></select>
+        <button class="ghost small" onclick="elLoadVoices()">Tải giọng</button>
+      </div>
+      <div class="flex" style="margin-top:12px">
+        <button onclick="elSave()">Lưu & nghe thử</button>
+        <button class="danger small" onclick="elClear()">Tắt giọng AI</button>
+      </div>
+      <div class="status" id="el-status"></div>
+      <div class="detail muted" style="margin-top:8px">Khi bật: bé trợ lý nói bằng giọng AI (cần mạng, tốn hạn mức ~10 phút/tháng gói miễn phí). Khi lỗi/hết hạn mức: tự quay về giọng máy.</div>
     </div>
 
     <div class="card">
@@ -392,8 +416,15 @@
   </div>
 </div>
 
-<button id="vol-btn" class="ghost" onclick="toggleVolPanel()" title="Âm lượng trợ lý"
-  style="position:fixed;right:23px;bottom:156px;width:44px;height:44px;border-radius:50%;font-size:17px;z-index:60;padding:0">🔊</button>
+<button id="vol-btn" class="ghost" onclick="toggleVolPanel()" title="Tùy chỉnh giọng bé trợ lý"
+  style="position:fixed;right:23px;bottom:156px;width:44px;height:44px;border-radius:50%;font-size:17px;z-index:60;padding:0;overflow:visible">
+  <span id="vol-emoji">🔊</span>
+  <img src="tro-ly.png" alt=""
+    onload="document.getElementById('vol-emoji').style.display='none'"
+    onerror="this.style.display='none'"
+    style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid rgba(56,189,248,.5)">
+  <span id="vol-badge" style="position:absolute;right:-5px;bottom:-5px;font-size:11px;background:#0d1526;border:1px solid var(--border);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;pointer-events:none">🔊</span>
+</button>
 <div id="vol-panel" style="position:fixed;right:76px;bottom:120px;z-index:65;width:250px;background:rgba(17,24,42,.96);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:16px;padding:14px;display:none;flex-direction:column;gap:4px;box-shadow:0 10px 28px rgba(0,0,0,.5)">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
     <img src="tro-ly.png" alt="" onerror="this.remove()" style="width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid rgba(56,189,248,.5)">
@@ -642,11 +673,25 @@ function schedulePush(){
   pushTimer = setTimeout(pushCloud, 2500);
 }
 
-async function cloudSyncNow(){
-  if(!S.cloud || !S.cloud.gistId){ cloudStatus('⚠️ Chưa kết nối. Dán token rồi bấm "Kết nối & đồng bộ".'); return; }
-  cloudStatus('Đang đồng bộ...');
-  try{ await pullCloud(); await pushCloud(); }
-  catch(e){ cloudStatus('❌ Lỗi: '+e.message); }
+async function cloudDownload(){
+  if(!S.cloud || !S.cloud.gistId){ cloudStatus('⚠️ Chưa kết nối. Dán token rồi bấm "Kết nối (lần đầu)" trước ạ.'); return; }
+  cloudStatus('⬇️ Đang tải dữ liệu đã lưu từ GitHub về...');
+  try{
+    await pullCloud();
+    cloudStatus('✅ Đã tải dữ liệu mới nhất về máy này.');
+    speak('Dạ, em tải dữ liệu về xong rồi ạ!');
+  }catch(e){ cloudStatus('❌ Lỗi tải: '+e.message); }
+}
+async function cloudBackup(){
+  if(!S.cloud || !S.cloud.gistId){ cloudStatus('⚠️ Chưa kết nối. Dán token rồi bấm "Kết nối (lần đầu)" trước ạ.'); return; }
+  cloudStatus('⬆️ Đang sao lưu lên GitHub...');
+  const before = S.cloud.lastSync;
+  clearTimeout(pushTimer);
+  await pushCloud();
+  if(S.cloud.lastSync !== before){
+    cloudStatus('✅ Đã sao lưu toàn bộ dữ liệu lên GitHub an toàn · '+timeAgo(S.cloud.lastSync));
+    speak('Dạ, em sao lưu xong rồi, sếp yên tâm nha!');
+  }
 }
 
 function cloudDisconnect(){
@@ -1123,6 +1168,10 @@ function fillSettings(){
   document.getElementById('set-voo').value = S.qty.voo||'';
   document.getElementById('set-usdt').value = S.qty.usdt||'';
   document.getElementById('set-usdc').value = S.qty.usdc||'';
+  if(elKey()){
+    document.getElementById('el-key').value = elKey();
+    document.getElementById('el-status').textContent = '✅ Giọng AI đang bật.';
+  }
   if(S.cloud && S.cloud.token){
     document.getElementById('gh-token').value = S.cloud.token;
     if(S.cloud.gistId && S.cloud.lastSync) cloudStatus('✅ Đang đồng bộ đám mây · lần cuối '+timeAgo(S.cloud.lastSync));
@@ -1243,8 +1292,11 @@ if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = 
 // âm lượng trợ lý: thanh trượt 0-100%
 let voiceVol = parseFloat(localStorage.getItem('qlt-voice-vol') ?? '1');
 function updateVolBtn(){
-  const b = document.getElementById('vol-btn');
-  if(b) b.textContent = voiceVol<=0 ? '🔇' : voiceVol<0.6 ? '🔉' : '🔊';
+  const icon = voiceVol<=0 ? '🔇' : voiceVol<0.6 ? '🔉' : '🔊';
+  const badge = document.getElementById('vol-badge');
+  if(badge) badge.textContent = icon;
+  const em = document.getElementById('vol-emoji');
+  if(em) em.textContent = icon;
   const s = document.getElementById('vol-slider'), v = document.getElementById('vol-val');
   if(s) s.value = Math.round(voiceVol*100);
   if(v) v.textContent = Math.round(voiceVol*100)+'%';
@@ -1278,19 +1330,78 @@ const PRONOUNCE = [
   [/vnd/gi, 'việt nam đồng'],
   [/₫/g, 'đồng'],
 ];
-function speak(text){
-  if(voiceVol<=0) return;
+/* ===== Giọng AI ElevenLabs (ưu tiên khi đã cấu hình) ===== */
+let elAudio = null;
+const elKey = ()=> localStorage.getItem('qlt-el-key') || '';
+const elVoiceId = ()=> localStorage.getItem('qlt-el-voice') || '';
+async function elLoadVoices(){
+  const key = document.getElementById('el-key').value.trim() || elKey();
+  const st = document.getElementById('el-status');
+  if(!key){ st.textContent = '⚠️ Sếp dán API key trước ạ.'; return; }
+  st.textContent = 'Đang tải danh sách giọng...';
+  try{
+    const r = await fetch('https://api.elevenlabs.io/v1/voices', {headers:{'xi-api-key': key}, signal: AbortSignal.timeout(15000)});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    const sel = document.getElementById('el-voice');
+    sel.innerHTML = (d.voices||[]).map(v=>`<option value="${v.voice_id}" ${v.voice_id===elVoiceId()?'selected':''}>${v.name}</option>`).join('')
+      || '<option value="">(Tài khoản chưa có giọng nào)</option>';
+    st.textContent = '✅ Chọn giọng trong danh sách rồi bấm "Lưu & nghe thử" ạ.';
+  }catch(e){ st.textContent = '❌ Lỗi: '+e.message+' — sếp kiểm tra lại key nha.'; }
+}
+function elSave(){
+  const key = document.getElementById('el-key').value.trim();
+  const vid = document.getElementById('el-voice').value;
+  const st = document.getElementById('el-status');
+  if(!key || !vid){ st.textContent = '⚠️ Cần dán key và chọn giọng trước ạ.'; return; }
+  localStorage.setItem('qlt-el-key', key);
+  localStorage.setItem('qlt-el-voice', vid);
+  st.textContent = '✅ Đã bật giọng AI!';
+  speak('Dạ em chào sếp Long ạ! Từ giờ em nói bằng giọng mới nè, sếp thấy em dễ thương hơn hơm?');
+}
+function elClear(){
+  localStorage.removeItem('qlt-el-key'); localStorage.removeItem('qlt-el-voice');
+  document.getElementById('el-key').value='';
+  document.getElementById('el-status').textContent = 'Đã tắt giọng AI, quay về giọng máy.';
+}
+async function speakEleven(text){
+  const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/'+elVoiceId()+'?output_format=mp3_44100_64', {
+    method: 'POST',
+    headers: {'xi-api-key': elKey(), 'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      text,
+      model_id: 'eleven_multilingual_v2',
+      voice_settings: {stability: 0.45, similarity_boost: 0.8, style: 0.3}
+    }),
+    signal: AbortSignal.timeout(20000)
+  });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const blob = await r.blob();
+  if(elAudio){ try{ elAudio.pause(); }catch(e){} }
+  elAudio = new Audio(URL.createObjectURL(blob));
+  elAudio.volume = voiceVol;
+  await elAudio.play();
+}
+function speakLocal(s){
   try{
     speechSynthesis.cancel(); // không nói chồng câu
-    let s = String(text);
-    for(const [re, rep] of PRONOUNCE) s = s.replace(re, rep);
     const u = new SpeechSynthesisUtterance(s);
     u.lang = 'vi-VN';
     if(viVoice) u.voice = viVoice;
-    u.rate = 1.0; u.pitch = voicePitch; // đọc chậm rãi mượt hơn, tông do sếp chỉnh trong bảng 🔊
+    u.rate = 1.0; u.pitch = voicePitch; // tông do sếp chỉnh trong bảng 🔊
     u.volume = voiceVol;
     speechSynthesis.speak(u);
   }catch(e){}
+}
+function speak(text){
+  if(voiceVol<=0) return;
+  let s = String(text);
+  for(const [re, rep] of PRONOUNCE) s = s.replace(re, rep);
+  if(elKey() && elVoiceId()){
+    speakEleven(s).catch(()=>speakLocal(s)); // lỗi mạng/hết hạn mức -> giọng máy
+  }else{
+    speakLocal(s);
+  }
 }
 updateVolBtn();
 function stripVN(s){ return s.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'d').toLowerCase(); }
@@ -1431,6 +1542,8 @@ function handleVoice(text){
     toast('🤖 '+msg); speak(msg); return;
   }
   if(/(cap nhat gia|lam moi gia|update gia|gia moi nhat)/.test(t)){ refreshPrices(true); toast('🔄 Đang cập nhật giá...'); speak('Dạ, em đang cập nhật giá cho sếp ạ'); return; }
+  if(/sao luu/.test(t)){ document.querySelectorAll('.tabs button')[3].click(); cloudBackup(); return; }
+  if(/(tai|lay|keo) du lieu/.test(t)){ document.querySelectorAll('.tabs button')[3].click(); cloudDownload(); return; }
   // BỘ LỌC bằng giọng nói: "lọc ăn uống từ ngày 1 đến ngày 15", "lọc chi tiêu tháng này"
   if(t.includes('loc') && (/tu ngay|den ngay|toi ngay|thang nay/.test(t) || S.categories.some(c=>t.includes(stripVN(c))))){
     const ym = todayStr().slice(0,7);
