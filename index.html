@@ -1024,7 +1024,7 @@ function addExpense(){
   document.getElementById('exp-amount').value=''; document.getElementById('exp-note').value='';
   render();
   const msg = `Đã trừ ${fmt(amount)} từ ${selSrc==='cash'?'tiền mặt':'TPBank'}`;
-  toast('✅ '+msg); speak(`Dạ, em đã ghi và trừ ${fmt(amount)} từ ${selSrc==='cash'?'tiền mặt':'TPBank'} cho sếp rồi ạ!`);
+  toast('✅ '+msg); speak('Dạ, em lưu xong rồi ạ!');
 }
 function addIncome(){
   const amount = parseMoney(document.getElementById('inc-amount').value);
@@ -1036,7 +1036,7 @@ function addIncome(){
   document.getElementById('inc-amount').value=''; document.getElementById('inc-note').value='';
   render();
   const msg = `Đã cộng ${fmt(amount)} vào ${source==='cash'?'tiền mặt':'TPBank'}`;
-  toast('✅ '+msg); speak(`Dạ, em đã cộng ${fmt(amount)} vào ${source==='cash'?'tiền mặt':'TPBank'} cho sếp rồi ạ! Chúc mừng sếp nha!`);
+  toast('✅ '+msg); speak('Dạ, em lưu xong rồi, chúc mừng sếp nha!');
 }
 function addATM(){
   const amount = parseMoney(document.getElementById('atm-amount').value);
@@ -1056,7 +1056,7 @@ function addATM(){
   const msg = dir==='ruttien'
     ? `Đã chuyển ${fmt(amount)} từ TPBank ra tiền mặt`
     : `Đã chuyển ${fmt(amount)} tiền mặt vào TPBank`;
-  toast('✅ '+msg); speak(`Dạ, em ${msg.charAt(0).toLowerCase()+msg.slice(1)} cho sếp rồi ạ!`);
+  toast('✅ '+msg); speak('Dạ, em lưu xong rồi ạ!');
 }
 function tfDirChanged(){
   const d = document.getElementById('tf-dir').value;
@@ -1097,7 +1097,7 @@ function addTransfer(){
   const msg = direction==='toBinance'
     ? `Đã trừ ${fmt(amount)} từ ${srcName}, chuyển vào Binance để đầu tư${usdtInfo}`
     : `Đã cộng ${fmt(amount)} vào ${srcName}, rút từ Binance về${usdtInfo}`;
-  toast('✅ '+msg); speak(`Dạ, em ${msg.replace(/\(≈.*\)/,'').charAt(0).toLowerCase()+msg.replace(/\(≈.*\)/,'').slice(1)} cho sếp rồi ạ!`);
+  toast('✅ '+msg); speak('Dạ, em lưu xong rồi ạ!');
 }
 function deleteTx(id){
   if(!confirm('Xóa giao dịch này? Số dư sẽ được hoàn lại.')) return;
@@ -1476,7 +1476,7 @@ function goTo(tabIdx, elId, label){
 }
 function confirmFill(msg){
   toast(`📝 ${msg}.<br>Sếp kiểm tra rồi bấm <b>Lưu</b> giúp em nha!`, 9000);
-  speak(`Dạ sếp ơi, em ${msg.charAt(0).toLowerCase()+msg.slice(1)} rồi ạ. Sếp kiểm tra rồi bấm lưu giúp em nha!`);
+  speak('Em đã giúp sếp ghi lại xong, mời sếp kiểm tra và xác nhận giúp em ạ!');
 }
 
 function fillExpense(amount, category, source, date, note){
