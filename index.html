@@ -589,8 +589,17 @@ async function gistApi(path, method='GET', body){
   return r.json();
 }
 
+function isEmptyState(st){
+  const noTx = !st.tx || st.tx.length===0;
+  const noOpen = !st.opening || (((st.opening.cash||0)===0) && ((st.opening.tpbank||0)===0));
+  const q = st.qty||{};
+  const noQty = ((q.e1||0)===0 && (q.voo||0)===0 && (q.usdt||0)===0 && (q.usdc||0)===0);
+  return noTx && noOpen && noQty;
+}
 function mergeStates(local, remote){
   if(!remote || !remote.tx) return local;
+  if(isEmptyState(local) && !isEmptyState(remote)) return remote; // máy trắng tinh: lấy nguyên bản trên mây
+  if(isEmptyState(remote) && !isEmptyState(local)) return local;  // mây rỗng: giữ dữ liệu máy, không cho đè
   const lNew = (local.updatedAt||'') >= (remote.updatedAt||'');
   const newer = lNew ? local : remote, older = lNew ? remote : local;
   const merged = JSON.parse(JSON.stringify(newer));
@@ -1322,6 +1331,14 @@ const PRONOUNCE = [
 ];
 /* ===== Giọng AI ElevenLabs (ưu tiên khi đã cấu hình) ===== */
 let elAudio = null;
+// iOS chỉ cho phát audio nếu "loa" được tạo từ 1 cú chạm — mở khóa sẵn ở lần chạm đầu tiên
+function unlockAudio(){
+  if(elAudio) return;
+  elAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=');
+  elAudio.play().catch(()=>{});
+}
+document.addEventListener('click', unlockAudio);
+document.addEventListener('touchend', unlockAudio);
 const elKey = ()=> localStorage.getItem('qlt-el-key') || '';
 const elVoiceId = ()=> localStorage.getItem('qlt-el-voice') || '';
 async function elLoadVoices(){
@@ -1367,8 +1384,9 @@ async function speakEleven(text){
   });
   if(!r.ok) throw new Error('HTTP '+r.status);
   const blob = await r.blob();
-  if(elAudio){ try{ elAudio.pause(); }catch(e){} }
-  elAudio = new Audio(URL.createObjectURL(blob));
+  if(!elAudio) unlockAudio();
+  try{ elAudio.pause(); }catch(e){}
+  elAudio.src = URL.createObjectURL(blob); // dùng lại "loa" đã mở khóa -> iOS cho phát
   elAudio.volume = voiceVol;
   await elAudio.play();
 }
@@ -1388,7 +1406,11 @@ function speak(text){
   let s = String(text);
   for(const [re, rep] of PRONOUNCE) s = s.replace(re, rep);
   if(elKey() && elVoiceId()){
-    speakEleven(s).catch(()=>speakLocal(s)); // lỗi mạng/hết hạn mức -> giọng máy
+    speakEleven(s).catch(e=>{
+      speakLocal(s); // lỗi mạng/hết hạn mức -> giọng máy
+      const st = document.getElementById('el-status');
+      if(st) st.textContent = '⚠️ Giọng AI lỗi ('+(e&&e.message||e)+') — tạm dùng giọng máy.';
+    });
   }else{
     speakLocal(s);
   }
