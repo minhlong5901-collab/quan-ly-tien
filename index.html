@@ -116,6 +116,9 @@
   input[type=range]{-webkit-appearance:none;appearance:none;height:6px;background:var(--card2);border:none;border-radius:6px;padding:0;box-shadow:none}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer;box-shadow:0 2px 8px rgba(56,189,248,.5)}
   input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer}
+  #voice-btn{position:relative}
+  #voice-btn.listening{box-shadow:0 0 0 4px rgba(244,63,94,.65), 0 8px 26px rgba(244,63,94,.5);animation:nghe 1s ease-in-out infinite}
+  @keyframes nghe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
 </style>
 </head>
 <body>
@@ -383,14 +386,28 @@
 
 <button id="vol-btn" class="ghost" onclick="toggleVolPanel()" title="Âm lượng trợ lý"
   style="position:fixed;right:23px;bottom:156px;width:44px;height:44px;border-radius:50%;font-size:17px;z-index:60;padding:0">🔊</button>
-<div id="vol-panel" style="position:fixed;right:76px;bottom:152px;z-index:65;background:rgba(17,24,42,.95);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:14px;padding:12px 14px;display:none;align-items:center;gap:10px;box-shadow:0 10px 28px rgba(0,0,0,.5)">
-  <span style="font-size:14px">🔈</span>
-  <input type="range" id="vol-slider" min="0" max="100" step="5" oninput="setVolume(this.value)" onchange="volumeChanged()" style="width:140px">
-  <span id="vol-val" style="font-size:12px;color:var(--muted);width:38px;text-align:right">100%</span>
+<div id="vol-panel" style="position:fixed;right:76px;bottom:120px;z-index:65;width:250px;background:rgba(17,24,42,.96);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:16px;padding:14px;display:none;flex-direction:column;gap:4px;box-shadow:0 10px 28px rgba(0,0,0,.5)">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <img src="tro-ly.png" alt="" onerror="this.remove()" style="width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid rgba(56,189,248,.5)">
+    <span style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px">🎀 Tùy chỉnh bé trợ lý</span>
+  </div>
+  <label style="margin-top:2px">Âm lượng <span id="vol-val" style="float:right;color:var(--muted)">100%</span></label>
+  <input type="range" id="vol-slider" min="0" max="100" step="5" oninput="setVolume(this.value)">
+  <label>Tông giọng (cao = cute hơn) <span id="pitch-val" style="float:right;color:var(--muted)">1.4</span></label>
+  <input type="range" id="pitch-slider" min="8" max="20" step="1" oninput="setPitch(this.value)">
+  <label>Giọng đọc</label>
+  <select id="voice-select" onchange="chooseVoice(this.value)" style="font-size:13px;padding:8px"></select>
+  <button class="ghost small" onclick="testVoice()" style="margin-top:10px">▶️ Nghe thử</button>
 </div>
-<button id="voice-btn" onclick="startVoice()" title="Điều khiển giọng nói"
-  style="position:fixed;right:16px;bottom:88px;width:58px;height:58px;border-radius:50%;font-size:24px;z-index:60;padding:0;box-shadow:0 8px 26px rgba(56,189,248,.5)">🎤</button>
-<div id="toast" style="position:fixed;left:50%;bottom:160px;transform:translateX(-50%);background:#0d1526;border:1px solid var(--border);border-radius:14px;padding:11px 16px;font-size:13px;z-index:70;display:none;max-width:86%;box-shadow:0 12px 32px rgba(0,0,0,.55);line-height:1.5"></div>
+<button id="voice-btn" onclick="startVoice()" title="Gọi bé trợ lý"
+  style="position:fixed;right:16px;bottom:88px;width:58px;height:58px;border-radius:50%;font-size:24px;z-index:60;padding:0;box-shadow:0 8px 26px rgba(56,189,248,.5);overflow:hidden">
+  <span id="voice-emoji">🎤</span>
+  <img id="assistant-avatar" src="tro-ly.png" alt=""
+    onload="document.getElementById('voice-emoji').style.display='none'"
+    onerror="this.style.display='none'"
+    style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover">
+</button>
+<div id="toast" style="position:fixed;left:50%;bottom:160px;transform:translateX(-50%);background:#0d1526;border:1px solid var(--border);border-radius:16px;padding:11px 14px;font-size:13px;z-index:70;display:none;max-width:86%;box-shadow:0 12px 32px rgba(0,0,0,.55);line-height:1.5;align-items:center;gap:10px"></div>
 
 <div class="tabs">
   <button class="active" onclick="showPage('overview',this)">🏠 Tổng quan</button>
@@ -1141,19 +1158,46 @@ function resetAll(){
 let recog = null, listening = false;
 function toast(msg, ms=3500){
   const el = document.getElementById('toast');
-  el.innerHTML = msg; el.style.display='block';
+  el.innerHTML = `<img src="tro-ly.png" alt="" onerror="this.remove()" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(56,189,248,.5)"><div>${msg}</div>`;
+  el.style.display='flex';
   clearTimeout(el._t); el._t = setTimeout(()=>el.style.display='none', ms);
 }
-// chọn giọng đọc tiếng Việt tốt nhất có trên máy
+// chọn giọng đọc tiếng Việt tốt nhất có trên máy (ưu tiên giọng sếp đã chọn)
 let viVoice = null;
+let voicePitch = parseFloat(localStorage.getItem('qlt-voice-pitch') ?? '1.4');
 function pickVoice(){
   try{
     const vs = speechSynthesis.getVoices();
-    viVoice = vs.find(v=>v.lang==='vi-VN' && /female|nu|linh|hoai|my/i.test(v.name))
+    const savedName = localStorage.getItem('qlt-voice-name');
+    viVoice = (savedName && vs.find(v=>v.name===savedName))
+           || vs.find(v=>v.lang==='vi-VN' && /hoaimy|linh|female|nu|vif/i.test(v.name))
            || vs.find(v=>v.lang==='vi-VN')
            || vs.find(v=>v.lang && v.lang.toLowerCase().startsWith('vi'))
            || null;
+    populateVoiceSelect(vs);
   }catch(e){}
+}
+function populateVoiceSelect(vs){
+  const sel = document.getElementById('voice-select');
+  if(!sel) return;
+  const viList = vs.filter(v=>v.lang && v.lang.toLowerCase().startsWith('vi'));
+  const list = viList.length ? viList : vs;
+  sel.innerHTML = list.map(v=>`<option value="${v.name.replace(/"/g,'&quot;')}" ${viVoice&&v.name===viVoice.name?'selected':''}>${v.name}${v.lang?' ('+v.lang+')':''}</option>`).join('')
+    || '<option>(Máy chưa có giọng đọc)</option>';
+}
+function chooseVoice(name){
+  localStorage.setItem('qlt-voice-name', name);
+  pickVoice();
+  testVoice();
+}
+function setPitch(val){
+  voicePitch = val/10;
+  localStorage.setItem('qlt-voice-pitch', String(voicePitch));
+  const p = document.getElementById('pitch-val');
+  if(p) p.textContent = voicePitch.toFixed(1);
+}
+function testVoice(){
+  speak('Dạ em chào sếp Long ạ! Em là bé trợ lý của sếp nè, sếp thấy giọng em dễ thương hơm?');
 }
 if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 // âm lượng trợ lý: thanh trượt 0-100%
@@ -1164,6 +1208,9 @@ function updateVolBtn(){
   const s = document.getElementById('vol-slider'), v = document.getElementById('vol-val');
   if(s) s.value = Math.round(voiceVol*100);
   if(v) v.textContent = Math.round(voiceVol*100)+'%';
+  const ps = document.getElementById('pitch-slider'), pv = document.getElementById('pitch-val');
+  if(ps) ps.value = Math.round(voicePitch*10);
+  if(pv) pv.textContent = voicePitch.toFixed(1);
 }
 function toggleVolPanel(){
   const p = document.getElementById('vol-panel');
@@ -1186,7 +1233,7 @@ function speak(text){
     const u = new SpeechSynthesisUtterance(String(text).replace(/₫/g,'đồng'));
     u.lang = 'vi-VN';
     if(viVoice) u.voice = viVoice;
-    u.rate = 1.06; u.pitch = 1.4; // giọng cao, trong trẻo kiểu dễ thương
+    u.rate = 1.08; u.pitch = voicePitch; // tông giọng do sếp chỉnh trong bảng 🔊
     u.volume = voiceVol;
     speechSynthesis.speak(u);
   }catch(e){}
@@ -1393,9 +1440,9 @@ function startVoice(){
   recog = new SR();
   recog.lang = 'vi-VN'; recog.interimResults = false; recog.maxAlternatives = 1;
   const btn = document.getElementById('voice-btn');
-  const done = ()=>{ listening=false; btn.style.background=''; btn.textContent='🎤'; };
-  recog.onstart = ()=>{ listening=true; btn.style.background='linear-gradient(135deg,#f43f5e,#e11d48)'; btn.textContent='🔴';
-    toast('🎤 Đang nghe... VD: <b>"chi 45k ăn uống"</b> · <b>"rút 2 triệu về ngân hàng"</b> · <b>"rút ATM 500k"</b> · <b>"mở báo cáo"</b> · <b>"tổng tài sản?"</b> · <b>"xong rồi, đóng app"</b>', 7000); };
+  const done = ()=>{ listening=false; btn.classList.remove('listening'); };
+  recog.onstart = ()=>{ listening=true; btn.classList.add('listening');
+    toast('🎤 Em đang nghe sếp nè... VD: <b>"chi 45k ăn uống"</b> · <b>"rút 2 triệu về ngân hàng"</b> · <b>"mở báo cáo"</b> · <b>"tổng tài sản?"</b> · <b>"xong rồi, đóng app"</b>', 7000); };
   recog.onend = done;
   recog.onerror = e=>{ done();
     if(e.error==='not-allowed') toast('⚠️ Hãy bấm Cho phép (Allow) khi trình duyệt hỏi quyền micro.', 5000);
