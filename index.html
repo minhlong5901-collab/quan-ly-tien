@@ -1377,7 +1377,7 @@ async function speakEleven(text){
     headers: {'xi-api-key': elKey(), 'Content-Type': 'application/json'},
     body: JSON.stringify({
       text,
-      model_id: 'eleven_multilingual_v2',
+      model_id: 'eleven_turbo_v2_5', // hỗ trợ tiếng Việt chuẩn + tốn 1 nửa credits
       voice_settings: {stability: 0.45, similarity_boost: 0.8, style: 0.3}
     }),
     signal: AbortSignal.timeout(20000)
