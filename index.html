@@ -82,6 +82,31 @@
     </div>
 
     <div class="card">
+      <h2>🥧 Cơ cấu tài sản & khuyến nghị</h2>
+      <div class="flex" style="gap:20px;align-items:center">
+        <div style="position:relative;width:140px;height:140px;flex-shrink:0">
+          <div id="donut" style="width:100%;height:100%;border-radius:50%;background:var(--card2)"></div>
+          <div style="position:absolute;inset:24px;background:var(--card);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column">
+            <div id="donut-pct" style="font-size:20px;font-weight:700">—</div>
+            <div class="detail muted">đầu tư</div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:160px">
+          <div class="row"><div class="name"><span style="color:var(--green)">●</span> Chi tiêu</div><div class="val" id="al-spend">—</div></div>
+          <div class="row"><div class="name"><span style="color:var(--blue)">●</span> Đầu tư</div><div class="val" id="al-invest">—</div></div>
+        </div>
+      </div>
+      <div id="advice" style="margin-top:12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.55"></div>
+      <div class="detail muted" style="margin-top:6px">Gợi ý tự động dựa trên dữ liệu của bạn, cập nhật theo thời gian thực — chỉ mang tính tham khảo, không phải lời khuyên đầu tư.</div>
+    </div>
+
+    <div class="card">
+      <h2>📈 Biến động tài sản theo ngày</h2>
+      <svg id="spark" viewBox="0 0 300 80" preserveAspectRatio="none" style="width:100%;height:80px;display:block"></svg>
+      <div id="hist-list" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
       <h2>💵 Tiền chi tiêu</h2>
       <div class="row">
         <div><div class="name">Tiền mặt</div><div class="detail">Ví của bạn</div></div>
@@ -148,6 +173,23 @@
     </div>
 
     <div class="card">
+      <h2>🏧 Rút / nộp tiền mặt</h2>
+      <div class="detail muted" style="margin-bottom:6px">Chuyển qua lại giữa TPBank và Tiền mặt — tổng tài sản không đổi, chỉ đổi chỗ.</div>
+      <label>Chiều chuyển</label>
+      <select id="atm-dir">
+        <option value="ruttien">🏧 Rút ATM: TPBank → Tiền mặt</option>
+        <option value="noptien">🏦 Nộp vào ngân hàng: Tiền mặt → TPBank</option>
+      </select>
+      <label>Số tiền (VND)</label>
+      <input type="text" id="atm-amount" inputmode="numeric" placeholder="VD: 2000000" oninput="formatMoneyInput(this)">
+      <label>Ngày</label>
+      <input type="date" id="atm-date">
+      <label>Ghi chú (không bắt buộc)</label>
+      <input type="text" id="atm-note" placeholder="VD: rút ATM đầu ngõ">
+      <div style="margin-top:14px"><button onclick="addATM()" style="width:100%">Lưu</button></div>
+    </div>
+
+    <div class="card">
       <h2>🔁 Chuyển tiền với Binance</h2>
       <div class="detail muted" style="margin-bottom:6px">
         <b>Nạp</b>: chuyển từ ngân hàng/tiền mặt vào Binance để đầu tư ·
@@ -159,7 +201,10 @@
         <option value="fromBinance">⬅️ Rút từ Binance về (lương / bán USDT)</option>
       </select>
       <label>Số tiền (VND)</label>
-      <input type="text" id="tf-amount" inputmode="numeric" placeholder="VD: 5000000" oninput="formatMoneyInput(this)">
+      <input type="text" id="tf-amount" inputmode="numeric" placeholder="VD: 5000000" oninput="formatMoneyInput(this);tfPreview()">
+      <label>Giá USDT lúc giao dịch (VND/USDT — giá P2P bạn khớp)</label>
+      <input type="number" id="tf-rate" step="any" inputmode="decimal" placeholder="VD: 26450" oninput="tfPreview()">
+      <div class="detail" id="tf-preview" style="margin-top:6px;color:var(--accent)"></div>
       <label id="tf-src-label">Trừ từ</label>
       <select id="tf-source"><option value="tpbank">🏦 TPBank</option><option value="cash">💵 Tiền mặt</option></select>
       <label>Ngày</label>
@@ -348,6 +393,11 @@ function balances(){
   const since = S.openingSince || '1970';
   for(const t of S.tx){
     if(t.createdAt && t.createdAt < since) continue;
+    if(t.type==='noibo'){ // rút ATM / nộp ngân hàng: chuyển chỗ, tổng không đổi
+      if(t.from==='tpbank'){ tpbank -= t.amount; cash += t.amount; }
+      else { cash -= t.amount; tpbank += t.amount; }
+      continue;
+    }
     let sign;
     if(t.type==='chi') sign = -1;
     else if(t.type==='thu') sign = 1;
@@ -417,7 +467,7 @@ async function getCrypto(){
 const GIST_FILE = 'qlt-data.json';
 let pushTimer = null;
 
-function exportState(){ const {cloud, ...rest} = S; return rest; } // không đưa token lên mây
+function exportState(){ const {cloud, binance, ...rest} = S; return rest; } // không đưa token GitHub lẫn key Binance lên mây
 
 async function gistApi(path, method='GET', body){
   const r = await fetch('https://api.github.com'+path, {
@@ -487,8 +537,10 @@ async function pullCloud(){
   let content = f.content;
   if(f.truncated){ const r = await fetch(f.raw_url); content = await r.text(); }
   const remote = JSON.parse(content);
-  const cloud = S.cloud;
+  const cloud = S.cloud, binance = S.binance;
   S = mergeStates(exportState(), remote);
+  delete S.binance;            // dọn key Binance cũ nếu còn sót trong dữ liệu trên mây
+  if(binance) S.binance = binance; // giữ key đang lưu trên máy này
   S.cloud = cloud;
   S.cloud.lastSync = new Date().toISOString();
   save(false); render();
@@ -635,6 +687,100 @@ async function refreshPrices(){
   btn.disabled = false;
 }
 
+/* ================= CƠ CẤU + KHUYẾN NGHỊ + LỊCH SỬ ================= */
+function monthChi(ym){ let s=0; for(const t of S.tx) if(t.type==='chi' && t.date.startsWith(ym)) s+=t.amount; return s; }
+function ymOffset(n){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,7); }
+
+function renderAllocation(spend, invest){
+  const total = spend+invest;
+  const donut = document.getElementById('donut');
+  const pctI = total>0 ? invest/total*100 : 0;
+  const pctS = 100-pctI;
+  donut.style.background = total>0
+    ? `conic-gradient(var(--green) 0 ${pctS.toFixed(1)}%, var(--blue) ${pctS.toFixed(1)}% 100%)`
+    : 'var(--card2)';
+  document.getElementById('donut-pct').textContent = total>0 ? pctI.toFixed(0)+'%' : '—';
+  document.getElementById('al-spend').textContent = total>0 ? `${fmt(spend)} · ${pctS.toFixed(0)}%` : '—';
+  document.getElementById('al-invest').textContent = total>0 ? `${fmt(invest)} · ${pctI.toFixed(0)}%` : '—';
+
+  // ----- Khuyến nghị tự động -----
+  const msgs = [];
+  if(total<=0){
+    msgs.push('Nhập số dư đầu kỳ ở tab Cài đặt để nhận gợi ý.');
+  }else{
+    const thisM = monthChi(ymOffset(0));
+    const prevMonths = [monthChi(ymOffset(-1)), monthChi(ymOffset(-2)), monthChi(ymOffset(-3))].filter(v=>v>0);
+    const avgChi = prevMonths.length ? prevMonths.reduce((a,b)=>a+b,0)/prevMonths.length : (thisM>0 ? thisM : 0);
+    if(avgChi > 0){
+      const months = spend/avgChi;
+      if(months < 3){
+        msgs.push(`Quỹ chi tiêu hiện đủ ~<b>${months.toFixed(1)} tháng</b> (bạn chi trung bình ${fmt(avgChi)}/tháng). Nên ưu tiên giữ đệm an toàn <b>3–6 tháng chi tiêu</b> trước khi nạp thêm vào đầu tư.`);
+      }else if(months > 6 && pctI < 75){
+        msgs.push(`Quỹ chi tiêu đang đủ ~<b>${months.toFixed(0)} tháng</b> — dư so với mức an toàn 3–6 tháng. Phần dôi ra (~${fmt(spend - avgChi*6)}) có thể cân nhắc chuyển dần sang đầu tư (E1VFVN30 / VOO) để tiền sinh lời.`);
+      }else{
+        msgs.push(`Cơ cấu đang cân đối: đệm chi tiêu ~<b>${months.toFixed(1)} tháng</b>, đầu tư chiếm <b>${pctI.toFixed(0)}%</b> tài sản. Duy trì nạp đầu tư đều đặn theo kế hoạch.`);
+      }
+      if(thisM > avgChi*1.2 && prevMonths.length){
+        msgs.push(`⚠️ Chi tiêu tháng này (${fmt(thisM)}) đang cao hơn trung bình ${Math.round((thisM/avgChi-1)*100)}% — xem lại tab Báo cáo để biết danh mục nào tăng.`);
+      }
+    }else{
+      msgs.push(pctI < 30
+        ? 'Phần lớn tài sản đang nằm ở tiền mặt/ngân hàng. Hãy ghi chép chi tiêu 1–2 tháng để hệ thống tính mức đệm an toàn và gợi ý phần có thể chuyển sang đầu tư.'
+        : 'Hãy ghi chép chi tiêu hằng ngày — sau 1–2 tháng hệ thống sẽ tính quỹ dự phòng phù hợp và khuyến nghị chính xác hơn.');
+    }
+    if(pctI > 90) msgs.push('⚠️ Hơn 90% tài sản đang ở kênh đầu tư — nếu cần tiền gấp có thể phải bán lúc giá xấu. Cân nhắc giữ thêm tiền mặt dự phòng.');
+  }
+  document.getElementById('advice').innerHTML = msgs.map(m=>'💡 '+m).join('<br>');
+}
+
+function recordHistory(total){
+  if(total<=0) return;
+  S.history = S.history||{};
+  const t = todayStr();
+  if(S.history[t]!==undefined && Math.abs(S.history[t]-total)<1) return;
+  S.history[t] = Math.round(total);
+  const keys = Object.keys(S.history).sort();
+  if(keys.length>400) for(const k of keys.slice(0, keys.length-400)) delete S.history[k];
+  save();
+}
+
+function renderHistory(){
+  const h = S.history||{};
+  const keys = Object.keys(h).sort();
+  const listEl = document.getElementById('hist-list');
+  const svg = document.getElementById('spark');
+  if(!keys.length){
+    listEl.innerHTML = '<div class="muted" style="font-size:13px">Chưa có dữ liệu — app tự ghi lại tổng tài sản mỗi ngày bạn mở app.</div>';
+    svg.innerHTML=''; return;
+  }
+  // đường biến động 30 ngày gần nhất
+  const last30 = keys.slice(-30);
+  const vals = last30.map(k=>h[k]);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = (max-min)||1;
+  const pts = vals.map((v,i)=>{
+    const x = last30.length>1 ? i*(300/(last30.length-1)) : 150;
+    const y = 73 - (v-min)/range*62;
+    return x.toFixed(1)+','+y.toFixed(1);
+  }).join(' ');
+  svg.innerHTML = `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>`
+    + (last30.length>1 ? `<circle cx="${pts.split(' ').pop().split(',')[0]}" cy="${pts.split(' ').pop().split(',')[1]}" r="3" fill="var(--accent)"/>` : '');
+  // danh sách 8 ngày gần nhất kèm tăng/giảm
+  const rows = [];
+  for(const k of keys.slice(-8).reverse()){
+    const idx = keys.indexOf(k);
+    const prev = idx>0 ? h[keys[idx-1]] : null;
+    let ch = '<span class="muted">—</span>';
+    if(prev!==null){
+      const d = h[k]-prev;
+      if(d>0) ch = `<span class="green">▲ ${fmt(d)}</span>`;
+      else if(d<0) ch = `<span class="red">▼ ${fmt(-d)}</span>`;
+    }
+    rows.push(`<div class="tx-item"><div>Ngày ${k.slice(8,10)}/${k.slice(5,7)}</div><div class="flex" style="flex-wrap:nowrap;gap:12px"><b>${fmt(h[k])}</b>${ch}</div></div>`);
+  }
+  listEl.innerHTML = rows.join('');
+}
+
 /* ================= HIỂN THỊ ================= */
 function render(){
   const b = balances();
@@ -662,6 +808,9 @@ function render(){
   document.getElementById('fx-note').textContent =
     `Tỷ giá USD/VND: ${P.fx ? fmtN(Math.round(P.fx)) : '—'}` + (P.updated ? ` · Giá cập nhật ${timeAgo(P.updated)}` : '');
 
+  renderAllocation(spend, invest);
+  if(P.updated) recordHistory(spend+invest); // chỉ ghi lịch sử khi đã có giá
+  renderHistory();
   renderTodayTx();
   renderCats();
   renderCatList();
@@ -682,14 +831,15 @@ function renderTodayTx(){
 function txRow(x){
   const src = x.source==='cash' ? '💵' : '🏦';
   let sign, cls;
-  if(x.type==='chuyen'){
+  if(x.type==='noibo'){ sign='⇄ '; cls='muted'; }
+  else if(x.type==='chuyen'){
     if(x.direction==='toBinance'){ sign='-'; cls='amber'; } else { sign='+'; cls='green'; }
   }else{
     sign = x.type==='chi' ? '-' : '+';
     cls = x.type==='chi' ? 'red' : 'green';
   }
   return `<div class="tx-item">
-    <div><b>${x.category}</b> ${x.note?('· '+escapeHtml(x.note)):''}<br><span class="muted">${x.date} ${src}</span></div>
+    <div><b>${x.category}</b> ${x.note?('· '+escapeHtml(x.note)):''}${x.rate?` <span class="muted">· ${x.usdt} USDT @ ${fmtN(x.rate)}</span>`:''}<br><span class="muted">${x.date} ${src}</span></div>
     <div class="flex" style="flex-wrap:nowrap"><span class="${cls}">${sign}${fmt(x.amount)}</span>
     <button class="small danger" onclick="deleteTx(${x.id})">✕</button></div>
   </div>`;
@@ -734,9 +884,39 @@ function addIncome(){
   render();
   alert(`Đã cộng ${fmt(amount)} vào ${source==='cash'?'Tiền mặt':'TPBank'}`);
 }
+function addATM(){
+  const amount = parseMoney(document.getElementById('atm-amount').value);
+  if(!amount){ alert('Nhập số tiền!'); return; }
+  const dir = document.getElementById('atm-dir').value;
+  const from = dir==='ruttien' ? 'tpbank' : 'cash';
+  const date = document.getElementById('atm-date').value || todayStr();
+  const note = document.getElementById('atm-note').value.trim();
+  S.tx.push({
+    id:Date.now(), date, type:'noibo', amount, from,
+    category: dir==='ruttien' ? 'Rút ATM' : 'Nộp vào ngân hàng',
+    source: from, note, createdAt:new Date().toISOString()
+  });
+  save();
+  document.getElementById('atm-amount').value=''; document.getElementById('atm-note').value='';
+  render();
+  alert(dir==='ruttien'
+    ? `Đã chuyển ${fmt(amount)}: TPBank → Tiền mặt`
+    : `Đã chuyển ${fmt(amount)}: Tiền mặt → TPBank`);
+}
 function tfDirChanged(){
   const d = document.getElementById('tf-dir').value;
   document.getElementById('tf-src-label').textContent = d==='toBinance' ? 'Trừ từ' : 'Cộng vào';
+  tfPreview();
+}
+function tfPreview(){
+  const amount = parseMoney(document.getElementById('tf-amount').value);
+  const rate = parseFloat(document.getElementById('tf-rate').value);
+  const d = document.getElementById('tf-dir').value;
+  const el = document.getElementById('tf-preview');
+  if(amount && rate>0){
+    const usdt = amount/rate;
+    el.textContent = (d==='toBinance' ? '≈ mua được ' : '≈ bán ra ') + usdt.toLocaleString('vi-VN',{maximumFractionDigits:2}) + ' USDT (giá ' + fmtN(rate) + ' ₫/USDT)';
+  } else el.textContent = '';
 }
 function addTransfer(){
   const amount = parseMoney(document.getElementById('tf-amount').value);
@@ -745,18 +925,23 @@ function addTransfer(){
   const source = document.getElementById('tf-source').value;
   const date = document.getElementById('tf-date').value || todayStr();
   const note = document.getElementById('tf-note').value.trim();
-  S.tx.push({
+  const rate = parseFloat(document.getElementById('tf-rate').value) || 0;
+  const tx = {
     id:Date.now(), date, type:'chuyen', direction, amount,
     category: direction==='toBinance' ? 'Nạp Binance (đầu tư)' : 'Rút từ Binance',
     source, note, createdAt:new Date().toISOString()
-  });
+  };
+  if(rate > 0){ tx.rate = rate; tx.usdt = Math.round(amount/rate*100)/100; }
+  S.tx.push(tx);
   save();
   document.getElementById('tf-amount').value=''; document.getElementById('tf-note').value='';
+  document.getElementById('tf-rate').value=''; document.getElementById('tf-preview').textContent='';
   render();
   const srcName = source==='cash' ? 'Tiền mặt' : 'TPBank';
+  const usdtInfo = tx.usdt ? ` (≈ ${tx.usdt} USDT @ ${fmtN(rate)})` : '';
   alert(direction==='toBinance'
-    ? `Đã trừ ${fmt(amount)} từ ${srcName} — chuyển vào Binance để đầu tư`
-    : `Đã cộng ${fmt(amount)} vào ${srcName} — rút từ Binance về`);
+    ? `Đã trừ ${fmt(amount)} từ ${srcName} — chuyển vào Binance để đầu tư${usdtInfo}`
+    : `Đã cộng ${fmt(amount)} vào ${srcName} — rút từ Binance về${usdtInfo}`);
 }
 function deleteTx(id){
   if(!confirm('Xóa giao dịch này? Số dư sẽ được hoàn lại.')) return;
@@ -792,10 +977,10 @@ function exportCSV(){
   const m = document.getElementById('report-month').value;
   const list = S.tx.filter(x=>x.date.startsWith(m)).sort((a,b)=>a.date.localeCompare(b.date));
   if(!list.length){ alert('Không có giao dịch trong tháng này.'); return; }
-  let csv = '﻿Ngày,Loại,Danh mục,Số tiền (VND),Nguồn,Ghi chú\n';
+  let csv = '﻿Ngày,Loại,Danh mục,Số tiền (VND),Nguồn,Giá USDT,Số USDT,Ghi chú\n';
   for(const x of list){
-    const loai = x.type==='chi' ? 'Chi' : x.type==='thu' ? 'Thu' : (x.direction==='toBinance' ? 'Nạp Binance' : 'Rút Binance');
-    csv += `${x.date},${loai},${x.category},${x.amount},${x.source==='cash'?'Tiền mặt':'TPBank'},"${(x.note||'').replace(/"/g,'""')}"\n`;
+    const loai = x.type==='chi' ? 'Chi' : x.type==='thu' ? 'Thu' : x.type==='noibo' ? 'Chuyển nội bộ' : (x.direction==='toBinance' ? 'Nạp Binance' : 'Rút Binance');
+    csv += `${x.date},${loai},${x.category},${x.amount},${x.source==='cash'?'Tiền mặt':'TPBank'},${x.rate||''},${x.usdt||''},"${(x.note||'').replace(/"/g,'""')}"\n`;
   }
   downloadFile(csv, `chi-tieu-${m}.csv`, 'text/csv');
 }
@@ -908,6 +1093,7 @@ function showPage(p, btn){
 document.getElementById('today-str').textContent = new Date().toLocaleDateString('vi-VN',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
 document.getElementById('exp-date').value = todayStr();
 document.getElementById('tf-date').value = todayStr();
+document.getElementById('atm-date').value = todayStr();
 selectSource('cash');
 // Đọc số dư Binance từ file binance-data.js (do script cap-nhat-binance tạo)
 if(window.BINANCE_DATA && BINANCE_DATA.updated && BINANCE_DATA.updated !== S.lastBnFile){
