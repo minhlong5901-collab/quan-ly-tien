@@ -113,6 +113,9 @@
   .src-btn{flex:1}
   h3{font-size:12px;color:var(--muted);margin:16px 0 8px;text-transform:uppercase;letter-spacing:1px;font-weight:700}
   .range-btn.active-range{background:linear-gradient(135deg,rgba(56,189,248,.3),rgba(129,140,248,.3));color:#fff;border-color:rgba(56,189,248,.5)}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:6px;background:var(--card2);border:none;border-radius:6px;padding:0;box-shadow:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer;box-shadow:0 2px 8px rgba(56,189,248,.5)}
+  input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer}
 </style>
 </head>
 <body>
@@ -378,6 +381,13 @@
   </div>
 </div>
 
+<button id="vol-btn" class="ghost" onclick="toggleVolPanel()" title="Âm lượng trợ lý"
+  style="position:fixed;right:23px;bottom:156px;width:44px;height:44px;border-radius:50%;font-size:17px;z-index:60;padding:0">🔊</button>
+<div id="vol-panel" style="position:fixed;right:76px;bottom:152px;z-index:65;background:rgba(17,24,42,.95);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:14px;padding:12px 14px;display:none;align-items:center;gap:10px;box-shadow:0 10px 28px rgba(0,0,0,.5)">
+  <span style="font-size:14px">🔈</span>
+  <input type="range" id="vol-slider" min="0" max="100" step="5" oninput="setVolume(this.value)" onchange="volumeChanged()" style="width:140px">
+  <span id="vol-val" style="font-size:12px;color:var(--muted);width:38px;text-align:right">100%</span>
+</div>
 <button id="voice-btn" onclick="startVoice()" title="Điều khiển giọng nói"
   style="position:fixed;right:16px;bottom:88px;width:58px;height:58px;border-radius:50%;font-size:24px;z-index:60;padding:0;box-shadow:0 8px 26px rgba(56,189,248,.5)">🎤</button>
 <div id="toast" style="position:fixed;left:50%;bottom:160px;transform:translateX(-50%);background:#0d1526;border:1px solid var(--border);border-radius:14px;padding:11px 16px;font-size:13px;z-index:70;display:none;max-width:86%;box-shadow:0 12px 32px rgba(0,0,0,.55);line-height:1.5"></div>
@@ -651,7 +661,7 @@ async function refreshPrices(announce=false){
   save(); render();
   st.textContent = results.join('  ·  ');
   btn.disabled = false;
-  if(announce) speak('Đã cập nhật giá xong ạ');
+  if(announce) speak('Dạ em cập nhật giá xong rồi ạ, sếp xem nha!');
 }
 
 /* ================= CƠ CẤU + KHUYẾN NGHỊ + LỊCH SỬ ================= */
@@ -935,7 +945,7 @@ function addExpense(){
   document.getElementById('exp-amount').value=''; document.getElementById('exp-note').value='';
   render();
   const msg = `Đã trừ ${fmt(amount)} từ ${selSrc==='cash'?'tiền mặt':'TPBank'}`;
-  toast('✅ '+msg); speak(msg);
+  toast('✅ '+msg); speak(`Dạ, em đã ghi và trừ ${fmt(amount)} từ ${selSrc==='cash'?'tiền mặt':'TPBank'} cho sếp rồi ạ!`);
 }
 function addIncome(){
   const amount = parseMoney(document.getElementById('inc-amount').value);
@@ -947,7 +957,7 @@ function addIncome(){
   document.getElementById('inc-amount').value=''; document.getElementById('inc-note').value='';
   render();
   const msg = `Đã cộng ${fmt(amount)} vào ${source==='cash'?'tiền mặt':'TPBank'}`;
-  toast('✅ '+msg); speak(msg);
+  toast('✅ '+msg); speak(`Dạ, em đã cộng ${fmt(amount)} vào ${source==='cash'?'tiền mặt':'TPBank'} cho sếp rồi ạ! Chúc mừng sếp nha!`);
 }
 function addATM(){
   const amount = parseMoney(document.getElementById('atm-amount').value);
@@ -967,7 +977,7 @@ function addATM(){
   const msg = dir==='ruttien'
     ? `Đã chuyển ${fmt(amount)} từ TPBank ra tiền mặt`
     : `Đã chuyển ${fmt(amount)} tiền mặt vào TPBank`;
-  toast('✅ '+msg); speak(msg);
+  toast('✅ '+msg); speak(`Dạ, em ${msg.charAt(0).toLowerCase()+msg.slice(1)} cho sếp rồi ạ!`);
 }
 function tfDirChanged(){
   const d = document.getElementById('tf-dir').value;
@@ -1008,7 +1018,7 @@ function addTransfer(){
   const msg = direction==='toBinance'
     ? `Đã trừ ${fmt(amount)} từ ${srcName}, chuyển vào Binance để đầu tư${usdtInfo}`
     : `Đã cộng ${fmt(amount)} vào ${srcName}, rút từ Binance về${usdtInfo}`;
-  toast('✅ '+msg); speak(msg.replace(/\(≈.*\)/,''));
+  toast('✅ '+msg); speak(`Dạ, em ${msg.replace(/\(≈.*\)/,'').charAt(0).toLowerCase()+msg.replace(/\(≈.*\)/,'').slice(1)} cho sếp rồi ạ!`);
 }
 function deleteTx(id){
   if(!confirm('Xóa giao dịch này? Số dư sẽ được hoàn lại.')) return;
@@ -1146,16 +1156,42 @@ function pickVoice(){
   }catch(e){}
 }
 if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+// âm lượng trợ lý: thanh trượt 0-100%
+let voiceVol = parseFloat(localStorage.getItem('qlt-voice-vol') ?? '1');
+function updateVolBtn(){
+  const b = document.getElementById('vol-btn');
+  if(b) b.textContent = voiceVol<=0 ? '🔇' : voiceVol<0.6 ? '🔉' : '🔊';
+  const s = document.getElementById('vol-slider'), v = document.getElementById('vol-val');
+  if(s) s.value = Math.round(voiceVol*100);
+  if(v) v.textContent = Math.round(voiceVol*100)+'%';
+}
+function toggleVolPanel(){
+  const p = document.getElementById('vol-panel');
+  p.style.display = p.style.display==='flex' ? 'none' : 'flex';
+  updateVolBtn();
+}
+function setVolume(val){
+  voiceVol = Math.max(0, Math.min(1, val/100));
+  localStorage.setItem('qlt-voice-vol', String(voiceVol));
+  updateVolBtn();
+}
+function volumeChanged(){
+  if(voiceVol>0) speak('Dạ, em nói ở mức này ạ!');
+  else toast('🔇 Đã tắt tiếng bé trợ lý');
+}
 function speak(text){
+  if(voiceVol<=0) return;
   try{
     speechSynthesis.cancel(); // không nói chồng câu
-    const u = new SpeechSynthesisUtterance(text);
+    const u = new SpeechSynthesisUtterance(String(text).replace(/₫/g,'đồng'));
     u.lang = 'vi-VN';
     if(viVoice) u.voice = viVoice;
-    u.rate = 1.02; u.pitch = 1.05;
+    u.rate = 1.06; u.pitch = 1.4; // giọng cao, trong trẻo kiểu dễ thương
+    u.volume = voiceVol;
     speechSynthesis.speak(u);
   }catch(e){}
 }
+updateVolBtn();
 function stripVN(s){ return s.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'d').toLowerCase(); }
 function parseAmountVN(text){
   const t = stripVN(text).replace(/\./g,'').replace(/,/g,'.');
@@ -1210,9 +1246,14 @@ function cleanCore(t){
 function goTo(tabIdx, elId, label){
   document.querySelectorAll('.tabs button')[tabIdx].click();
   if(elId) setTimeout(()=>{ const el=document.getElementById(elId); if(el) el.scrollIntoView({behavior:'smooth', block:'center'}); }, 180);
-  toast(label); speak(label.replace(/[^\p{L}\p{N} ]/gu,'').trim());
+  toast(label);
+  const name = label.replace(/^[^\p{L}]*Đã mở\s*/u,'').replace(/[^\p{L}\p{N} ]/gu,'').trim();
+  speak(name ? `Dạ, em mở ${name} cho sếp rồi ạ!` : 'Dạ, em mở rồi ạ!');
 }
-function confirmFill(msg){ toast(`📝 ${msg}.<br>Kiểm tra rồi bấm <b>Lưu</b> để xác nhận nhé.`, 9000); speak(msg+'. Bấm lưu để xác nhận'); }
+function confirmFill(msg){
+  toast(`📝 ${msg}.<br>Sếp kiểm tra rồi bấm <b>Lưu</b> giúp em nha!`, 9000);
+  speak(`Dạ sếp ơi, em ${msg.charAt(0).toLowerCase()+msg.slice(1)} rồi ạ. Sếp kiểm tra rồi bấm lưu giúp em nha!`);
+}
 
 function fillExpense(amount, category, source, date, note){
   document.querySelectorAll('.tabs button')[1].click();
@@ -1261,34 +1302,34 @@ function handleVoice(text){
   const t = stripVN(text);
   // ===== 1. ĐÓNG APP =====
   if(/(dong app|tat app|dong ung dung|toi day thoi|den day thoi|hom nay du roi|toi xong roi|(oke|ok|duoc) roi.*(dong|xong|nghi)|xong roi.*(dong|nghi)|tam biet)/.test(t)){
-    speak('Đã lưu dữ liệu xong. Em chào Chủ Tịch, hẹn gặp lại ạ!');
-    toast('👋 Đang lưu dữ liệu và đóng app...');
+    speak('Dạ, em lưu xong hết rồi ạ! Em chào sếp Long, sếp nghỉ ngơi vui vẻ nha!');
+    toast('👋 Bé trợ lý đang lưu dữ liệu và đóng app...');
     try{ if(S.cloud && S.cloud.gistId){ clearTimeout(pushTimer); pushCloud(); } }catch(e){}
-    setTimeout(()=>{ window.close(); toast('✅ Đã lưu xong — Chủ Tịch có thể đóng app.', 6000); }, 3000);
+    setTimeout(()=>{ window.close(); toast('✅ Đã lưu xong hết rồi ạ — sếp có thể đóng app.', 6000); }, 3200);
     return;
   }
   // ===== 2. TRỢ LÝ HỎI ĐÁP =====
   if(/(xin chao|chao em|chao tro ly|hello|alo em)/.test(t)){
-    const msg = 'Em chào Chủ Tịch! Chủ Tịch muốn ghi chép, xem báo cáo hay hỏi gì cứ nói ạ.';
+    const msg = 'Dạ em chào sếp Long ạ! Sếp muốn ghi chép, xem báo cáo hay hỏi gì cứ nói với em nha!';
     toast('🤖 '+msg); speak(msg); return;
   }
   if(/(tong tai san|tai san (cua toi|bao nhieu|hien tai|the nao)|toi co bao nhieu tien)/.test(t)){
     const b = balances(), P = S.prices;
     const invest = (S.qty.e1||0)*(P.e1||0) + (S.qty.voo||0)*(P.vooUSD||0)*(P.fx||0) + (S.qty.usdt||0)*(P.usdtVND||0) + (S.qty.usdc||0)*(P.usdcVND||0);
     const spend = b.cash + b.tpbank;
-    const msg = `Tổng tài sản của Chủ Tịch là ${fmt(spend+invest)}. Tiền chi tiêu ${fmt(spend)}, tiền đầu tư ${fmt(invest)}.`;
+    const msg = `Dạ thưa sếp, tổng tài sản của sếp là ${fmt(spend+invest)} ạ. Trong đó tiền chi tiêu ${fmt(spend)}, tiền đầu tư ${fmt(invest)} ạ.`;
     toast('🤖 '+msg); speak(msg); return;
   }
   if(t.includes('hom nay') && /(tieu|chi|het bao nhieu)/.test(t) && !parseAmountVN(cleanCore(t))){
     let s=0; for(const x of S.tx) if(x.type==='chi' && x.date===todayStr()) s+=x.amount;
-    const msg = s>0 ? `Hôm nay Chủ Tịch đã chi ${fmt(s)}.` : 'Hôm nay Chủ Tịch chưa chi khoản nào. Quá tiết kiệm ạ!';
+    const msg = s>0 ? `Dạ hôm nay sếp đã chi ${fmt(s)} rồi ạ.` : 'Dạ hôm nay sếp chưa chi khoản nào luôn, sếp tiết kiệm ghê á!';
     toast('🤖 '+msg); speak(msg); return;
   }
   if(t.includes('thang nay') && /(tieu|chi|het bao nhieu)/.test(t) && !parseAmountVN(cleanCore(t))){
-    const msg = `Tháng này Chủ Tịch đã chi tổng cộng ${fmt(monthChi(ymOffset(0)))}.`;
+    const msg = `Dạ tháng này sếp đã chi tổng cộng ${fmt(monthChi(ymOffset(0)))} ạ.`;
     toast('🤖 '+msg); speak(msg); return;
   }
-  if(/(cap nhat gia|lam moi gia|update gia|gia moi nhat)/.test(t)){ refreshPrices(true); toast('🔄 Đang cập nhật giá...'); speak('Đang cập nhật giá ạ'); return; }
+  if(/(cap nhat gia|lam moi gia|update gia|gia moi nhat)/.test(t)){ refreshPrices(true); toast('🔄 Đang cập nhật giá...'); speak('Dạ, em đang cập nhật giá cho sếp ạ'); return; }
 
   // ===== 3. PHÂN TÍCH GIAO DỊCH =====
   const date = parseVoiceDate(t) || todayStr();
@@ -1315,7 +1356,7 @@ function handleVoice(text){
     ];
     for(const [re, tab, el, label] of NAV){ if(re.test(t)){ goTo(tab, el, label); return; } }
     toast(`🎤 Nghe được: "<i>${text}</i>"<br>Em chưa hiểu ạ. Thử: <b>"chi 45k ăn uống"</b>, <b>"rút 2 triệu về ngân hàng"</b>, <b>"mở báo cáo"</b>, <b>"tổng tài sản bao nhiêu"</b>`, 6000);
-    speak('Em chưa hiểu, Chủ Tịch nói lại giúp em ạ');
+    speak('Hic, em chưa hiểu ý sếp, sếp nói lại giúp em với ạ');
     return;
   }
 
