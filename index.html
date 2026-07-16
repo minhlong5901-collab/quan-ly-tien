@@ -1288,6 +1288,21 @@ function guessCategory(text){
   for(const [cat, keys] of CAT_KEYS){ if(S.categories.includes(cat) && keys.some(k=>t.includes(k))) return cat; }
   return S.categories.includes('Khác') ? 'Khác' : S.categories[0];
 }
+function parseVoiceDate(t){
+  const m = t.match(/ngay\s+(\d{1,2})\s+thang\s+(\d{1,2})(?:\s+nam\s+(\d{4}))?/);
+  if(!m) return null;
+  const now = new Date();
+  const dd = String(parseInt(m[1],10)).padStart(2,'0');
+  const mm = String(parseInt(m[2],10)).padStart(2,'0');
+  let y = m[3] ? parseInt(m[3],10) : now.getFullYear();
+  let ds = `${y}-${mm}-${dd}`;
+  if(!m[3] && ds > todayStr()) ds = `${y-1}-${mm}-${dd}`; // chưa tới ngày đó trong năm nay -> hiểu là năm ngoái
+  return ds;
+}
+function extractNote(text){
+  const m = text.match(/ghi ch[uú]\s+(.+)$/i);
+  return m ? m[1].trim() : '';
+}
 function handleVoice(text){
   const t = stripVN(text);
   const tabs = document.querySelectorAll('.tabs button');
@@ -1296,27 +1311,48 @@ function handleVoice(text){
   if(t.includes('bien dong')||t.includes('bao cao')||t.includes('bieu do')){ tabs[2].click(); toast('📈 Đã mở Biến động'); return; }
   if(t.includes('cai dat')){ tabs[3].click(); toast('⚙️ Đã mở Cài đặt'); return; }
   if(t.includes('cap nhat gia')||t.includes('lam moi gia')){ refreshPrices(); toast('🔄 Đang cập nhật giá...'); return; }
-  if(t.includes('mo chi tieu')||t==='chi tieu'){ tabs[1].click(); toast('✍️ Đã mở Chi tiêu'); return; }
-  // ghi giao dịch bằng giọng nói
-  const amount = parseAmountVN(text);
+  if(t==='chi tieu'||t.includes('mo chi tieu')){ tabs[1].click(); toast('✍️ Đã mở Chi tiêu'); return; }
+
+  // tách ngày + ghi chú, phần lõi còn lại dùng để đọc số tiền/nguồn
+  const date = parseVoiceDate(t) || todayStr();
+  const note = extractNote(text);
+  const core = t
+    .replace(/ngay\s+\d{1,2}\s+thang\s+\d{1,2}(\s+nam\s+\d{4})?/,' ')
+    .replace(/ghi chu\s+.*$/,' ');
+  const amount = parseAmountVN(core);
   if(!amount){
-    toast(`🎤 Nghe được: "<i>${text}</i>"<br>Chưa hiểu số tiền. Thử nói: <b>"ăn trưa 45 nghìn tiền mặt"</b> hoặc <b>"grab 30k ngân hàng"</b>`, 5000);
+    toast(`🎤 Nghe được: "<i>${text}</i>"<br>Chưa hiểu số tiền. VD: <b>"ngày 16 tháng 7 chi 45 nghìn tiền mặt cho ăn uống ghi chú trà sữa"</b>`, 6000);
     return;
   }
-  const source = /(ngan hang|tp ?bank|chuyen khoan|the ngan hang|bang the)/.test(t) ? 'tpbank' : 'cash';
-  const srcName = source==='cash' ? 'tiền mặt' : 'TPBank';
-  if(/(nhan luong|nhan tien|luong ve|thu nhap|duoc cho|duoc thuong|nap tien vao)/.test(t)){
-    S.tx.push({id:Date.now(), date:todayStr(), type:'thu', amount, category:'Thu nhập', source, note:'🎤 '+text, createdAt:new Date().toISOString()});
-    save(); render();
-    const msg = `Đã cộng ${fmt(amount)} vào ${srcName}`;
-    toast('✅ '+msg+`<br><span class="muted">"${text}"</span>`, 5000); speak(msg);
+  const source = /(ngan hang|tp ?bank|chuyen khoan|the ngan hang|bang the)/.test(core) ? 'tpbank' : 'cash';
+  const srcName = source==='cash' ? 'Tiền mặt' : 'TPBank';
+  const dd = date.slice(8,10)+'/'+date.slice(5,7);
+
+  // KHOẢN THU: điền sẵn form "Nạp thêm tiền" rồi chờ xác nhận
+  if(/(nhan luong|nhan tien|luong ve|thu nhap|duoc cho|duoc thuong|nap tien vao)/.test(core)){
+    tabs[1].click();
+    const el = document.getElementById('inc-amount');
+    el.value = amount.toLocaleString('vi-VN');
+    document.getElementById('inc-source').value = source;
+    document.getElementById('inc-note').value = note || text;
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    toast(`📝 Đã điền khoản thu: <b>${fmt(amount)}</b> vào ${srcName}.<br>Kiểm tra rồi bấm <b>Lưu khoản thu</b> để xác nhận.`, 8000);
+    speak(`Đã điền ${fmt(amount)} vào ${srcName}, bấm lưu để xác nhận`);
     return;
   }
-  const category = guessCategory(text);
-  S.tx.push({id:Date.now(), date:todayStr(), type:'chi', amount, category, source, note:'🎤 '+text, createdAt:new Date().toISOString()});
-  save(); render();
-  const msg = `Đã ghi ${fmt(amount)} ${category}, trừ ${srcName}`;
-  toast('✅ '+msg+`<br><span class="muted">"${text}"</span>`, 5000); speak(msg);
+
+  // KHOẢN CHI: điền sẵn form "Ghi khoản chi" rồi chờ xác nhận
+  const category = guessCategory(core + ' ' + stripVN(note));
+  tabs[1].click();
+  const el = document.getElementById('exp-amount');
+  el.value = amount.toLocaleString('vi-VN');
+  selectCat(category);
+  selectSource(source);
+  document.getElementById('exp-date').value = date;
+  document.getElementById('exp-note').value = note;
+  el.scrollIntoView({behavior:'smooth', block:'center'});
+  toast(`📝 Đã điền: <b>${fmt(amount)}</b> · ${category} · ${srcName} · ngày ${dd}${note?` · "${note}"`:''}.<br>Kiểm tra rồi bấm <b>Lưu khoản chi</b> để xác nhận.`, 8000);
+  speak(`Đã điền ${fmt(amount)}, ${category}, ${srcName}, ngày ${parseInt(date.slice(8,10))} tháng ${parseInt(date.slice(5,7))}. Bấm lưu để xác nhận`);
 }
 function startVoice(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
