@@ -416,15 +416,8 @@
   </div>
 </div>
 
-<button id="vol-btn" class="ghost" onclick="toggleVolPanel()" title="Tùy chỉnh giọng bé trợ lý"
-  style="position:fixed;right:23px;bottom:156px;width:44px;height:44px;border-radius:50%;font-size:17px;z-index:60;padding:0;overflow:visible">
-  <span id="vol-emoji">🔊</span>
-  <img src="tro-ly.png" alt=""
-    onload="document.getElementById('vol-emoji').style.display='none'"
-    onerror="this.style.display='none'"
-    style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid rgba(56,189,248,.5)">
-  <span id="vol-badge" style="position:absolute;right:-5px;bottom:-5px;font-size:11px;background:#0d1526;border:1px solid var(--border);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;pointer-events:none">🔊</span>
-</button>
+<button id="vol-btn" class="ghost" onclick="toggleVolPanel()" title="Âm lượng trợ lý"
+  style="position:fixed;right:23px;bottom:156px;width:44px;height:44px;border-radius:50%;font-size:17px;z-index:60;padding:0">🔊</button>
 <div id="vol-panel" style="position:fixed;right:76px;bottom:120px;z-index:65;width:250px;background:rgba(17,24,42,.96);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:16px;padding:14px;display:none;flex-direction:column;gap:4px;box-shadow:0 10px 28px rgba(0,0,0,.5)">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
     <img src="tro-ly.png" alt="" onerror="this.remove()" style="width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid rgba(56,189,248,.5)">
@@ -1292,11 +1285,8 @@ if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = 
 // âm lượng trợ lý: thanh trượt 0-100%
 let voiceVol = parseFloat(localStorage.getItem('qlt-voice-vol') ?? '1');
 function updateVolBtn(){
-  const icon = voiceVol<=0 ? '🔇' : voiceVol<0.6 ? '🔉' : '🔊';
-  const badge = document.getElementById('vol-badge');
-  if(badge) badge.textContent = icon;
-  const em = document.getElementById('vol-emoji');
-  if(em) em.textContent = icon;
+  const b = document.getElementById('vol-btn');
+  if(b) b.textContent = voiceVol<=0 ? '🔇' : voiceVol<0.6 ? '🔉' : '🔊';
   const s = document.getElementById('vol-slider'), v = document.getElementById('vol-val');
   if(s) s.value = Math.round(voiceVol*100);
   if(v) v.textContent = Math.round(voiceVol*100)+'%';
