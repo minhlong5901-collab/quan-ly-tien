@@ -523,6 +523,12 @@ function load(){
     localStorage.setItem('qlt-data', JSON.stringify(S));
   }
   if((S.qty.e1||0)>0){ S.qty.e1 = 0; localStorage.setItem('qlt-data', JSON.stringify(S)); } // đã bỏ theo dõi VN30
+  // dọn ảnh chụp đầu tư cũ (còn dính VN30 đã gỡ) để biến động không bị lệch ảo — chạy 1 lần
+  if(!S.histV2){
+    S.history = {};
+    S.histV2 = true;
+    localStorage.setItem('qlt-data', JSON.stringify(S));
+  }
   if((S.qty.usdt||0)>0 || (S.qty.usdc||0)>0 || (S.qty.voo||0)>0){
     S.custom = S.custom||[];
     const add = (sym, qty, price, src)=>{ if(qty>0 && !S.custom.find(c=>c.sym.toUpperCase()===sym)) S.custom.push(src ? {sym, qty, price, src} : {sym, qty, price}); };
