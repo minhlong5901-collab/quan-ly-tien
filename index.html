@@ -75,7 +75,9 @@
     transition:border-color .15s ease, box-shadow .15s ease;
   }
   .rec-dot{width:10px;height:10px;border-radius:50%;background:#f43f5e;animation:nghe 1s ease-in-out infinite;flex-shrink:0}
-  #note-body{min-height:200px;background:rgba(20,29,49,.85);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:15px;line-height:1.65;outline:none}
+  #note-body{min-height:200px;background:rgba(20,29,49,.85);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:15px;line-height:1.65;outline:none;color:var(--text) !important;-webkit-text-fill-color:var(--text)}
+  #note-body *{color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;background:transparent !important}
+  #note-body:empty:before{content:'Nội dung ghi chú...';color:var(--muted);-webkit-text-fill-color:var(--muted)}
   #note-body:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,189,248,.18)}
   #note-body img{max-width:100%;border-radius:10px;margin:6px 0}
   #note-body h2{all:unset;display:block;font-size:21px;font-weight:800;color:var(--text);margin:8px 0 4px}
@@ -486,11 +488,11 @@
 </div>
 
 <div class="tabs">
-  <button class="active" onclick="showPage('overview',this)">🏠 Tổng quan</button>
-  <button onclick="showPage('expense',this)">✍️ Chi tiêu</button>
-  <button onclick="showPage('report',this)">📈 Biến động</button>
-  <button onclick="showPage('settings',this)">⚙️ Cài đặt</button>
-  <button onclick="showPage('notes',this)">📁 Dự án</button>
+  <button class="active" data-page="overview" onclick="showPage('overview',this)">🏠 Tổng quan</button>
+  <button data-page="expense" onclick="showPage('expense',this)">✍️ Chi tiêu</button>
+  <button data-page="report" onclick="showPage('report',this)">📈 Biến động</button>
+  <button data-page="notes" onclick="showPage('notes',this)">📁 Dự án</button>
+  <button data-page="settings" onclick="showPage('settings',this)">⚙️ Cài đặt</button>
 </div>
 
 <script>
@@ -1899,8 +1901,13 @@ function cleanCore(t){
     .replace(/gia\s+\d[\d\.]*/,' ')
     .replace(/ghi chu\s+.*$/,' ');
 }
+function goTab(p){
+  if(typeof p === 'number') p = ['overview','expense','report','notes','settings'][p]; // tương thích chỉ số cũ trong NAV
+  const b = document.querySelector('.tabs button[data-page="'+p+'"]');
+  if(b) b.click();
+}
 function goTo(tabIdx, elId, label){
-  document.querySelectorAll('.tabs button')[tabIdx].click();
+  goTab(tabIdx);
   if(elId) setTimeout(()=>{ const el=document.getElementById(elId); if(el) el.scrollIntoView({behavior:'smooth', block:'center'}); }, 180);
   toast(label);
   const name = label.replace(/^[^\p{L}]*Đã mở\s*/u,'').replace(/[^\p{L}\p{N} ]/gu,'').trim();
@@ -1912,7 +1919,7 @@ function confirmFill(msg){
 }
 
 function fillExpense(amount, category, source, date, note){
-  document.querySelectorAll('.tabs button')[1].click();
+  goTab('expense');
   const el = document.getElementById('exp-amount');
   el.value = amount.toLocaleString('vi-VN');
   selectCat(category);
@@ -1923,7 +1930,7 @@ function fillExpense(amount, category, source, date, note){
   confirmFill(`Đã điền khoản chi ${fmt(amount)}, ${category}, ${walletName(resolveWalletId(source))}, ngày ${parseInt(date.slice(8,10))} tháng ${parseInt(date.slice(5,7))}${note?', ghi chú '+note:''}`);
 }
 function fillIncome(amount, source, note){
-  document.querySelectorAll('.tabs button')[1].click();
+  goTab('expense');
   const el = document.getElementById('inc-amount');
   el.value = amount.toLocaleString('vi-VN');
   document.getElementById('inc-source').value = resolveWalletId(source);
@@ -1932,7 +1939,7 @@ function fillIncome(amount, source, note){
   confirmFill(`Đã điền khoản thu ${fmt(amount)} vào ${walletName(resolveWalletId(source))}`);
 }
 function fillInternal(from, to, amount, date, note){
-  document.querySelectorAll('.tabs button')[1].click();
+  goTab('expense');
   document.getElementById('iv-from').value = from;
   document.getElementById('iv-to').value = to;
   const el = document.getElementById('atm-amount');
@@ -1950,7 +1957,7 @@ function fillATM(dir, amount, date, note){
   fillInternal(from, to, amount, date, note);
 }
 function fillTransfer(direction, amount, source, date, rate, note){
-  document.querySelectorAll('.tabs button')[1].click();
+  goTab('expense');
   document.getElementById('tf-dir').value = direction; tfDirChanged();
   const el = document.getElementById('tf-amount');
   el.value = amount.toLocaleString('vi-VN');
@@ -2064,7 +2071,7 @@ async function aiHandle(text){
     case 'atm': fillInternal(resolveWalletId(p.from), resolveWalletId(p.to), p.amount, date, p.note||''); break;
     case 'transfer': fillTransfer(p.direction||'toBinance', p.amount, resolveWalletId(p.source), date, p.rate||0, p.note||''); break;
     case 'filter':
-      document.querySelectorAll('.tabs button')[2].click();
+      goTab('report');
       document.getElementById('flt-from').value = p.from || todayStr().slice(0,8)+'01';
       document.getElementById('flt-to').value = p.to || todayStr();
       renderCatList();
@@ -2073,24 +2080,24 @@ async function aiHandle(text){
       setTimeout(()=>document.getElementById('flt-result').scrollIntoView({behavior:'smooth', block:'center'}), 300);
       break;
     case 'report':
-      document.querySelectorAll('.tabs button')[2].click();
+      goTab('report');
       if(p.month) document.getElementById('report-month').value = p.month;
       renderReport(); toast('📊 '+say); speak(say);
       break;
     case 'navigate': {
-      const map = {tongquan:0, chitieu:1, biendong:2, caidat:3, duan:4, ghichu:4};
-      document.querySelectorAll('.tabs button')[map[p.target] ?? 0].click();
+      const map = {tongquan:'overview', chitieu:'expense', biendong:'report', caidat:'settings', duan:'notes', ghichu:'notes'};
+      goTab(map[p.target] || 'overview');
       toast('🤖 '+say); speak(say); break;
     }
     case 'note_new': {
-      document.querySelectorAll('.tabs button')[4].click();
+      goTab('notes');
       openNoteDraft(null, p.title||'', String(p.body||'').replace(/\n/g,'<br>'));
       toast('📝 '+say, 8000); speak(say); break;
     }
     case 'note_edit': {
       const n = (S.notes||[]).find(x=>x.code.toLowerCase()===String(p.code||'').toLowerCase());
       if(!n){ const m = 'Em không tìm thấy ghi chú mã '+(p.code||'?')+' ạ.'; toast('🤖 '+m); speak(m); break; }
-      document.querySelectorAll('.tabs button')[4].click();
+      goTab('notes');
       let body = n.body||'';
       if(p.replace) body = String(p.replace).replace(/\n/g,'<br>');
       else if(p.append) body += (body?'<br>':'') + String(p.append).replace(/\n/g,'<br>');
@@ -2227,8 +2234,8 @@ function handleVoiceRules(text){
     else { toast('🤖 Sếp chưa đặt mã PIN — vào Cài đặt → Khóa app để bật trước ạ.'); speak('Sếp chưa đặt mã khóa ạ'); }
     return;
   }
-  if(/sao luu/.test(t)){ document.querySelectorAll('.tabs button')[3].click(); cloudBackup(true); return; }
-  if(/(tai|lay|keo) du lieu/.test(t)){ document.querySelectorAll('.tabs button')[3].click(); cloudDownload(true); return; }
+  if(/sao luu/.test(t)){ goTab('settings'); cloudBackup(true); return; }
+  if(/(tai|lay|keo) du lieu/.test(t)){ goTab('settings'); cloudDownload(true); return; }
   // BỘ LỌC bằng giọng nói: "lọc ăn uống từ ngày 1 đến ngày 15", "lọc chi tiêu tháng này"
   if(t.includes('loc') && (/tu ngay|den ngay|toi ngay|thang nay|thang \d/.test(t) || S.categories.some(c=>t.includes(stripVN(c))))){
     const ym = todayStr().slice(0,7);
@@ -2253,7 +2260,7 @@ function handleVoiceRules(text){
     }
     let cat = '';
     for(const c of S.categories){ if(t.includes(stripVN(c))){ cat = c; break; } }
-    document.querySelectorAll('.tabs button')[2].click();
+    goTab('report');
     renderReport();
     document.getElementById('flt-from').value = from;
     document.getElementById('flt-to').value = to;
@@ -2270,7 +2277,7 @@ function handleVoiceRules(text){
     const ym = todayStr().slice(0,7);
     let mm = parseInt(mBC[1],10), y = parseInt(ym.slice(0,4),10);
     if(mm > parseInt(ym.slice(5,7),10)) y--;
-    document.querySelectorAll('.tabs button')[2].click();
+    goTab('report');
     document.getElementById('report-month').value = `${y}-${String(mm).padStart(2,'0')}`;
     renderReport();
     setTimeout(()=>document.getElementById('report-month').scrollIntoView({behavior:'smooth', block:'center'}), 250);
@@ -2300,19 +2307,19 @@ function handleVoiceRules(text){
       return;
     }
     const NAV = [
-      [/bao cao|thong ke|tong ket thang/, 2, 'report-month', '📊 Đã mở Báo cáo tháng'],
-      [/bien dong|bieu do|do thi|chart/, 2, 'hist-cur', '📈 Đã mở Biến động tài sản'],
-      [/co cau|khuyen nghi|phan bo|loi khuyen/, 0, 'donut', '🥧 Đã mở Cơ cấu và khuyến nghị'],
-      [/tong quan|trang chu|man hinh chinh|trang dau/, 0, null, '🏠 Đã mở Tổng quan'],
-      [/dong bo|dam may/, 3, 'gh-token', '☁️ Đã mở Đồng bộ đám mây'],
-      [/sao luu|backup/, 3, 'card-backup', '💾 Đã mở Sao lưu'],
-      [/danh muc/, 3, 'new-cat', '🗂️ Đã mở Danh mục chi tiêu'],
-      [/cai dat|thiet lap|so du|so luong|vi chi tieu/, 3, 'wallet-editor', '⚙️ Đã mở Cài đặt'],
-      [/binance/, 1, 'tf-dir', '🔁 Đã mở Chuyển tiền Binance'],
-      [/ghi chu|du an/, 4, 'notes-list', '📁 Đã mở Dự án & ghi chú'],
-      [/rut tien|atm|nop tien|chuyen vi/, 1, 'iv-from', '🏧 Đã mở Chuyển giữa các ví'],
-      [/khoan thu|nap tien|luong/, 1, 'inc-amount', '➕ Đã mở Nạp thêm tiền'],
-      [/chi tieu|khoan chi|ghi chi/, 1, 'exp-amount', '➖ Đã mở Ghi khoản chi'],
+      [/bao cao|thong ke|tong ket thang/, 'report', 'report-month', '📊 Đã mở Báo cáo tháng'],
+      [/bien dong|bieu do|do thi|chart/, 'report', 'hist-cur', '📈 Đã mở Biến động tài sản'],
+      [/co cau|khuyen nghi|phan bo|loi khuyen/, 'overview', 'donut', '🥧 Đã mở Cơ cấu và khuyến nghị'],
+      [/tong quan|trang chu|man hinh chinh|trang dau/, 'overview', null, '🏠 Đã mở Tổng quan'],
+      [/dong bo|dam may/, 'settings', 'gh-token', '☁️ Đã mở Đồng bộ đám mây'],
+      [/sao luu|backup/, 'settings', 'card-backup', '💾 Đã mở Sao lưu'],
+      [/danh muc/, 'settings', 'new-cat', '🗂️ Đã mở Danh mục chi tiêu'],
+      [/cai dat|thiet lap|so du|so luong|vi chi tieu/, 'settings', 'wallet-editor', '⚙️ Đã mở Cài đặt'],
+      [/binance/, 'expense', 'tf-dir', '🔁 Đã mở Chuyển tiền Binance'],
+      [/ghi chu|du an/, 'notes', 'notes-list', '📁 Đã mở Dự án & ghi chú'],
+      [/rut tien|atm|nop tien|chuyen vi/, 'expense', 'iv-from', '🏧 Đã mở Chuyển giữa các ví'],
+      [/khoan thu|nap tien|luong/, 'expense', 'inc-amount', '➕ Đã mở Nạp thêm tiền'],
+      [/chi tieu|khoan chi|ghi chi/, 'expense', 'exp-amount', '➖ Đã mở Ghi khoản chi'],
     ];
     for(const [re, tab, el, label] of NAV){ if(re.test(t)){ goTo(tab, el, label); return; } }
     toast(`🎤 Nghe được: "<i>${text}</i>"<br>Em chưa hiểu ạ. Thử: <b>"chi 45k ăn uống"</b>, <b>"rút 2 triệu về ngân hàng"</b>, <b>"mở báo cáo"</b>, <b>"tổng tài sản bao nhiêu"</b>`, 6000);
@@ -2352,24 +2359,46 @@ function handleVoiceRules(text){
   }
   fillExpense(amount, gcat, source, date, note);
 }
+let voiceHeard = '';
+function setBanner(txt){
+  const b = document.getElementById('rec-banner');
+  if(b) b.innerHTML = '<span class="rec-dot"></span> '+txt;
+}
 function startVoice(){
+  unlockAudio(); // mở khóa loa iOS ngay từ cú chạm nút mic
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ toast('⚠️ Trình duyệt này chưa hỗ trợ giọng nói. Hãy dùng <b>Chrome</b> (máy tính hoặc Android).', 5000); return; }
+  if(!SR){ toast('⚠️ Trình duyệt này chưa hỗ trợ giọng nói. Hãy dùng <b>Safari/Chrome</b> mới nhất.', 5000); return; }
   if(listening){ try{ recog.stop(); }catch(e){} return; }
+  voiceHeard = '';
   recog = new SR();
-  recog.lang = 'vi-VN'; recog.interimResults = false; recog.maxAlternatives = 1;
+  recog.lang = 'vi-VN'; recog.interimResults = true; recog.continuous = false; recog.maxAlternatives = 1;
   const btn = document.getElementById('voice-btn');
   const cmic = document.getElementById('chat-mic');
   const banner = document.getElementById('rec-banner');
   const done = ()=>{ listening=false; btn.classList.remove('listening'); if(cmic) cmic.classList.remove('listening'); if(banner) banner.style.display='none'; };
-  recog.onstart = ()=>{ listening=true; btn.classList.add('listening'); if(cmic) cmic.classList.add('listening'); if(banner) banner.style.display='flex'; };
-  recog.onend = done;
-  recog.onerror = e=>{ done();
-    if(e.error==='not-allowed') toast('⚠️ Hãy bấm Cho phép (Allow) khi trình duyệt hỏi quyền micro.', 5000);
-    else if(e.error!=='aborted') toast('⚠️ Không nghe rõ, bấm 🎤 thử lại nhé.');
+  recog.onstart = ()=>{ listening=true; btn.classList.add('listening'); if(cmic) cmic.classList.add('listening'); if(banner) banner.style.display='flex'; setBanner('Đang nghe... nói đi sếp ơi'); };
+  recog.onaudiostart = ()=> setBanner('🎙️ Micro đã bật, sếp nói đi ạ');
+  recog.onspeechstart = ()=> setBanner('👂 Đang nghe sếp nói...');
+  recog.onresult = e=>{
+    let txt = '';
+    for(let i=0;i<e.results.length;i++) txt += e.results[i][0].transcript;
+    voiceHeard = txt;
+    setBanner('“'+escapeHtml(txt)+'”'); // hiện chữ ngay khi nghe được -> có tín hiệu
+    if(e.results[e.results.length-1].isFinal){
+      done();
+      if(voiceHeard.trim()){ chatPush('u', '🎤 '+escapeHtml(voiceHeard.trim())); handleVoice(voiceHeard.trim()); }
+    }
   };
-  recog.onresult = e=>{ done(); const said = e.results[0][0].transcript; chatPush('u', '🎤 '+escapeHtml(said)); handleVoice(said); };
-  recog.start();
+  recog.onerror = e=>{ done();
+    if(e.error==='not-allowed'||e.error==='service-not-allowed') toast('⚠️ Bấm Cho phép (Allow) khi hỏi quyền micro. iPhone: Cài đặt → Safari → Micro → Cho phép.', 6000);
+    else if(e.error==='no-speech') toast('🤖 Em chưa nghe thấy gì ạ, sếp bấm 🎤 nói to hơn chút nha.', 4000);
+    else if(e.error!=='aborted') toast('⚠️ Micro trục trặc ('+e.error+'), sếp thử lại nhé.', 4000);
+  };
+  recog.onend = ()=>{
+    // iOS đôi khi kết thúc mà không có isFinal -> vẫn xử lý câu đã nghe được
+    if(listening){ done(); if(voiceHeard.trim()){ chatPush('u', '🎤 '+escapeHtml(voiceHeard.trim())); handleVoice(voiceHeard.trim()); } }
+  };
+  try{ recog.start(); }catch(e){ done(); toast('⚠️ Không mở được micro, sếp thử lại sau 1 giây nhé.'); }
 }
 
 /* ================= ĐIỀU HƯỚNG ================= */
