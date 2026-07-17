@@ -1977,11 +1977,36 @@ function saveGem(){
   const k = document.getElementById('gem-key').value.trim();
   if(!k){ gemStatus('⚠️ Dán API key trước ạ.'); return; }
   localStorage.setItem('qlt-gem-key', k);
-  gemStatus('✅ Đã bật bộ não AI — bấm 🎤 nói gì cũng hiểu.');
+  localStorage.removeItem('qlt-gem-model'); localStorage.removeItem('qlt-gem-list'); // key mới -> quét model lại
+  gemStatus('✅ Đã lưu key. Bấm "🔎 Kiểm tra AI" để dò model và thử kết nối ạ.');
 }
 function clearGem(){ localStorage.removeItem('qlt-gem-key'); document.getElementById('gem-key').value=''; gemStatus('Đã tắt AI, dùng bộ luật cơ bản.'); }
+// hỏi Google danh sách model khả dụng của key này (không đoán tên)
+async function discoverGemModels(){
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key='+gemKey(), {signal: AbortSignal.timeout(20000)});
+  if(!r.ok){
+    let msg='HTTP '+r.status; try{ const j=await r.json(); msg+=': '+((j.error&&j.error.message)||'').slice(0,120); }catch(_){}
+    throw new Error(msg);
+  }
+  const d = await r.json();
+  const usable = (d.models||[])
+    .filter(m => (m.supportedGenerationMethods||[]).includes('generateContent'))
+    .map(m => m.name.replace('models/',''))
+    .filter(n => /gemini/.test(n) && !/embedding|vision|aqa|thinking/.test(n));
+  // ưu tiên flash (nhanh, rẻ), rồi flash-lite, rồi bản mới nhất
+  const rank = n => (/2\.5.*flash-lite/.test(n)?0 : /2\.5.*flash/.test(n)?1 : /2\.0.*flash/.test(n)?2 : /flash/.test(n)?3 : 5) - (parseFloat((n.match(/(\d\.\d)/)||[])[1]||0))/100;
+  usable.sort((a,b)=>rank(a)-rank(b));
+  if(!usable.length) throw new Error('Key hợp lệ nhưng không có model generateContent nào.');
+  localStorage.setItem('qlt-gem-list', JSON.stringify(usable));
+  return usable;
+}
 async function askGemini(prompt){
-  const models = ['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-flash-latest','gemini-1.5-flash'];
+  let models = [];
+  const saved = localStorage.getItem('qlt-gem-model');
+  if(saved) models.push(saved); // ưu tiên model từng chạy được
+  try{ models = models.concat(JSON.parse(localStorage.getItem('qlt-gem-list')||'[]')); }catch(e){}
+  if(models.length < 2){ try{ models = models.concat(await discoverGemModels()); }catch(e){ if(!models.length) throw e; } }
+  models = [...new Set(models)];
   let lastE;
   for(const m of models){
     try{
@@ -1993,6 +2018,7 @@ async function askGemini(prompt){
       if(!r.ok){
         let msg = 'HTTP '+r.status;
         try{ const j = await r.json(); msg += ': '+((j.error&&j.error.message)||'').slice(0,100); }catch(_){}
+        if(r.status===404){ localStorage.removeItem('qlt-gem-model'); localStorage.removeItem('qlt-gem-list'); } // tên cũ -> quét lại lần sau
         throw new Error(msg);
       }
       const d = await r.json();
