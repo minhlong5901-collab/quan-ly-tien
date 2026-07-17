@@ -27,12 +27,12 @@
       radial-gradient(700px 500px at 50% 110%, rgba(52,211,153,.07), transparent 60%),
       var(--bg);
     background-attachment:fixed;
-    color:var(--text);min-height:100vh;padding-bottom:96px;
+    color:var(--text);min-height:100vh;padding-bottom:calc(96px + env(safe-area-inset-bottom));
   }
   ::-webkit-scrollbar{width:10px}
   ::-webkit-scrollbar-thumb{background:#26314d;border-radius:8px}
   ::selection{background:rgba(56,189,248,.35)}
-  .container{max-width:860px;margin:0 auto;padding:18px 16px}
+  .container{max-width:860px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top)) 16px 18px}
   h1{font-size:22px;margin-bottom:4px;font-weight:800;letter-spacing:.2px}
   .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
   .card{
@@ -79,7 +79,7 @@
   input::placeholder{color:#5b6b8a}
   label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;font-weight:500}
   .tabs{
-    position:fixed;bottom:10px;left:12px;right:12px;max-width:836px;margin:0 auto;
+    position:fixed;bottom:calc(10px + env(safe-area-inset-bottom));left:12px;right:12px;max-width:836px;margin:0 auto;
     background:rgba(17,24,42,.88);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
     border:1px solid var(--border);border-radius:18px;display:flex;z-index:50;padding:6px;gap:4px;
     box-shadow:0 12px 32px rgba(2,6,17,.55);
@@ -414,7 +414,7 @@
 </div>
 
 <div id="chat-panel" style="position:fixed;inset:0;z-index:90;background:rgba(8,13,28,.97);display:none;flex-direction:column">
-  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)">
+  <div style="display:flex;align-items:center;gap:10px;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;border-bottom:1px solid var(--border)">
     <img src="tro-ly.png" alt="" onerror="this.style.display='none'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid rgba(56,189,248,.5)">
     <b style="flex:1">Bé trợ lý 💬</b>
     <button class="ghost small" onclick="toggleChat()">✕ Đóng</button>
@@ -430,9 +430,9 @@
   <span class="rec-dot"></span> Đang ghi âm... nói xong tự gửi
 </div>
 <button id="chat-btn" class="ghost" onclick="toggleChat()" title="Chat với bé trợ lý"
-  style="position:fixed;right:23px;bottom:156px;width:44px;height:44px;border-radius:50%;font-size:18px;z-index:60;padding:0">💬</button>
+  style="position:fixed;right:23px;bottom:calc(156px + env(safe-area-inset-bottom));width:44px;height:44px;border-radius:50%;font-size:18px;z-index:60;padding:0">💬</button>
 <button id="voice-btn" onclick="startVoice()" title="Gọi bé trợ lý"
-  style="position:fixed;right:16px;bottom:88px;width:58px;height:58px;border-radius:50%;font-size:24px;z-index:60;padding:0;box-shadow:0 8px 26px rgba(56,189,248,.5);overflow:hidden">
+  style="position:fixed;right:16px;bottom:calc(88px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:50%;font-size:24px;z-index:60;padding:0;box-shadow:0 8px 26px rgba(56,189,248,.5);overflow:hidden">
   <span id="voice-emoji">🎤</span>
   <img id="assistant-avatar" src="tro-ly.png" alt=""
     onload="document.getElementById('voice-emoji').style.display='none'"
@@ -1634,9 +1634,19 @@ const PRONOUNCE = [
 let elAudio = null;
 // iOS chỉ cho phát audio nếu "loa" được tạo từ 1 cú chạm — mở khóa sẵn ở lần chạm đầu tiên
 function unlockAudio(){
-  if(elAudio) return;
-  elAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=');
-  elAudio.play().catch(()=>{});
+  if(!elAudio){
+    elAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=');
+    elAudio.play().catch(()=>{});
+  }
+  // mở khóa luôn bộ đọc hệ thống (iOS yêu cầu lần nói đầu phải từ cú chạm)
+  try{
+    if(!window._ttsUnlocked && 'speechSynthesis' in window){
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      speechSynthesis.speak(u);
+      window._ttsUnlocked = true;
+    }
+  }catch(e){}
 }
 document.addEventListener('click', unlockAudio);
 document.addEventListener('touchend', unlockAudio);
@@ -1694,12 +1704,14 @@ async function speakEleven(text){
 function speakLocal(s){
   try{
     speechSynthesis.cancel(); // không nói chồng câu
+    speechSynthesis.resume(); // iOS hay kẹt ở trạng thái paused
     const u = new SpeechSynthesisUtterance(s);
     u.lang = 'vi-VN';
     if(viVoice) u.voice = viVoice;
     u.rate = 1.0; u.pitch = voicePitch; // tông do sếp chỉnh trong bảng 🔊
     u.volume = voiceVol;
     speechSynthesis.speak(u);
+    setTimeout(()=>{ try{ speechSynthesis.resume(); }catch(e){} }, 120); // đá thêm phát nữa cho chắc
   }catch(e){}
 }
 function speak(text){
