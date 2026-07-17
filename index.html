@@ -180,22 +180,6 @@
 
     <div class="card">
       <h2>📈 Tiền đầu tư</h2>
-      <div class="row">
-        <div><div class="name">E1VFVN30</div><div class="detail" id="d-e1">—</div></div>
-        <div class="val" id="v-e1">0 ₫</div>
-      </div>
-      <div class="row">
-        <div><div class="name">VOO</div><div class="detail" id="d-voo">—</div></div>
-        <div class="val" id="v-voo">0 ₫</div>
-      </div>
-      <div class="row">
-        <div><div class="name">USDT</div><div class="detail" id="d-usdt">—</div></div>
-        <div class="val" id="v-usdt">0 ₫</div>
-      </div>
-      <div class="row">
-        <div><div class="name">USDC</div><div class="detail" id="d-usdc">—</div></div>
-        <div class="val" id="v-usdc">0 ₫</div>
-      </div>
       <div id="custom-rows"></div>
       <div class="price-note" id="fx-note">Tỷ giá USD/VND: —</div>
     </div>
@@ -335,14 +319,7 @@
       <input type="text" id="set-cash" inputmode="numeric" oninput="formatMoneyInput(this)">
       <label>TPBank (VND)</label>
       <input type="text" id="set-tpbank" inputmode="numeric" oninput="formatMoneyInput(this)">
-      <label>E1VFVN30 (số chứng chỉ quỹ)</label>
-      <input type="number" id="set-e1" min="0" step="any">
-      <label>VOO (số cổ phiếu, cho phép lẻ)</label>
-      <input type="number" id="set-voo" min="0" step="any">
-      <label>USDT (số lượng)</label>
-      <input type="number" id="set-usdt" min="0" step="any">
-      <label>USDC (số lượng)</label>
-      <input type="number" id="set-usdc" min="0" step="any">
+      <div class="detail muted" style="margin-top:8px">Tiền ảo / cổ phiếu quản lý ở mục 🪙 Token Binance tùy chỉnh bên dưới.</div>
       <div style="margin-top:14px"><button onclick="saveSettings()" style="width:100%">Lưu số dư</button></div>
     </div>
 
@@ -487,6 +464,18 @@ function load(){
     categories:[...DEFAULT_CATS]
   };
 }
+// chuyển số dư tiền ảo/cổ phiếu cũ sang danh sách token (chạy 1 lần)
+(function migrateQty(){
+  if((S.qty.usdt||0)>0 || (S.qty.usdc||0)>0 || (S.qty.voo||0)>0){
+    S.custom = S.custom||[];
+    const add = (sym, qty, price, src)=>{ if(qty>0 && !S.custom.find(c=>c.sym.toUpperCase()===sym)) S.custom.push(src ? {sym, qty, price, src} : {sym, qty, price}); };
+    add('USDT', S.qty.usdt, 1);
+    add('USDC', S.qty.usdc, 1);
+    add('VOO', S.qty.voo, S.prices.vooUSD||0, 'yahoo');
+    S.qty.usdt = 0; S.qty.usdc = 0; S.qty.voo = 0;
+    localStorage.setItem('qlt-data', JSON.stringify(S));
+  }
+})();
 function save(push=true){
   S.updatedAt = new Date().toISOString();
   localStorage.setItem('qlt-data', JSON.stringify(S));
@@ -542,32 +531,54 @@ function investTotal(){
   return (S.qty.e1||0)*(P.e1||0) + (S.qty.voo||0)*(P.vooUSD||0)*(P.fx||0)
        + (S.qty.usdt||0)*(P.usdtVND||0) + (S.qty.usdc||0)*(P.usdcVND||0) + customVND();
 }
+function fetchYahooPrice(sym){
+  return fetchWithProxies(`https://query1.finance.yahoo.com/v8/finance/chart/${sym.toUpperCase()}?interval=1d&range=1d`)
+    .then(d=>{ const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice; if(!p) throw new Error('no price'); return p; });
+}
 async function getCustomPrices(){
   const list = S.custom||[];
   if(!list.length) return;
-  const syms = list.map(c=>c.sym.toUpperCase()+'USDT');
-  const d = await fetchWithProxies('https://data-api.binance.vision/api/v3/ticker/price?symbols='+encodeURIComponent(JSON.stringify(syms)));
-  for(const it of d){
-    const sym = it.symbol.replace(/USDT$/,'');
-    const c = list.find(x=>x.sym.toUpperCase()===sym);
-    if(c) c.price = parseFloat(it.price);
+  const jobs = [];
+  const bn = list.filter(c=>c.sym.toUpperCase()!=='USDT' && c.src!=='yahoo');
+  if(bn.length){
+    const syms = bn.map(c=>c.sym.toUpperCase()+'USDT');
+    jobs.push(fetchWithProxies('https://data-api.binance.vision/api/v3/ticker/price?symbols='+encodeURIComponent(JSON.stringify(syms))).then(d=>{
+      for(const it of d){
+        const sym = it.symbol.replace(/USDT$/,'');
+        const c = list.find(x=>x.sym.toUpperCase()===sym);
+        if(c) c.price = parseFloat(it.price);
+      }
+    }));
   }
+  for(const c of list){
+    if(c.sym.toUpperCase()==='USDT'){ c.price = 1; continue; } // USDT luôn = 1 USDT
+    if(c.src==='yahoo') jobs.push(fetchYahooPrice(c.sym).then(p=>{ c.price = p; }).catch(()=>{})); // cổ phiếu Mỹ (VOO...) tính theo USD ≈ USDT
+  }
+  await Promise.all(jobs);
 }
 async function addToken(){
   const sym = document.getElementById('tok-sym').value.trim().toUpperCase();
   const qty = parseFloat(document.getElementById('tok-qty').value);
   if(!sym || isNaN(qty) || qty < 0){ toast('⚠️ Nhập mã token và số lượng ạ!'); return; }
-  toast('Đang kiểm tra '+sym+' trên Binance...');
+  toast('Đang kiểm tra '+sym+'...');
+  let price = 0, src = '';
   try{
-    const d = await fetchWithProxies('https://data-api.binance.vision/api/v3/ticker/price?symbol='+sym+'USDT');
-    const price = parseFloat(d.price);
-    S.custom = S.custom||[];
-    const ex = S.custom.find(c=>c.sym.toUpperCase()===sym);
-    if(ex){ ex.qty = qty; ex.price = price; } else S.custom.push({sym, qty, price});
-    save(); render();
-    document.getElementById('tok-sym').value=''; document.getElementById('tok-qty').value='';
-    toast('✅ Đã thêm '+sym+' — giá '+price+' USDT');
-  }catch(e){ toast('❌ Không tìm thấy cặp '+sym+'/USDT trên Binance.'); }
+    if(sym === 'USDT'){ price = 1; }
+    else{
+      const d = await fetchWithProxies('https://data-api.binance.vision/api/v3/ticker/price?symbol='+sym+'USDT');
+      price = parseFloat(d.price);
+    }
+  }catch(e){
+    try{ price = await fetchYahooPrice(sym); src = 'yahoo'; } // không có trên Binance -> thử cổ phiếu Mỹ (VOO, AAPL...)
+    catch(e2){ toast('❌ Không tìm thấy '+sym+' trên Binance lẫn thị trường Mỹ.'); return; }
+  }
+  S.custom = S.custom||[];
+  const ex = S.custom.find(c=>c.sym.toUpperCase()===sym);
+  if(ex){ ex.qty = qty; ex.price = price; if(src) ex.src = src; }
+  else S.custom.push(src ? {sym, qty, price, src} : {sym, qty, price});
+  save(); render();
+  document.getElementById('tok-sym').value=''; document.getElementById('tok-qty').value='';
+  toast('✅ Đã thêm '+sym+' — giá '+price+(src?' USD (cổ phiếu Mỹ)':' USDT'));
 }
 function removeToken(i){
   if(!confirm('Xóa '+S.custom[i].sym+' khỏi danh mục?')) return;
@@ -579,10 +590,15 @@ function renderTokens(){
     `<span class="tag">${c.sym.toUpperCase()} · ${fmtN(c.qty)} <span style="cursor:pointer;color:var(--red)" onclick="removeToken(${i})">✕</span></span>`).join('')
     || '<span class="muted" style="font-size:12px">Chưa có token nào — thêm bên dưới</span>';
   const rows = document.getElementById('custom-rows');
-  if(rows) rows.innerHTML = (S.custom||[]).map(c=>{
-    const vnd = (c.qty||0)*(c.price||0)*(S.prices.usdtVND||S.prices.fx||0);
-    return `<div class="row"><div><div class="name">${c.sym.toUpperCase()}</div><div class="detail">${fmtN(c.qty||0)} × ${c.price ? c.price.toLocaleString('en-US',{maximumFractionDigits:4})+' USDT' : '—'}</div></div><div class="val">${fmt(vnd)}</div></div>`;
-  }).join('');
+  if(rows){
+    let html = '';
+    if((S.qty.e1||0) > 0) html += `<div class="row"><div><div class="name">E1VFVN30</div><div class="detail">${fmtN(S.qty.e1)} ccq × ${S.prices.e1 ? fmtN(S.prices.e1)+' ₫' : '—'}</div></div><div class="val">${fmt((S.qty.e1||0)*(S.prices.e1||0))}</div></div>`;
+    html += (S.custom||[]).map(c=>{
+      const vnd = (c.qty||0)*(c.price||0)*(S.prices.usdtVND||S.prices.fx||0);
+      return `<div class="row"><div><div class="name">${c.sym.toUpperCase()}</div><div class="detail">${fmtN(c.qty||0)} × ${c.price ? c.price.toLocaleString('en-US',{maximumFractionDigits:4})+' USDT' : '—'}</div></div><div class="val">${fmt(vnd)}</div></div>`;
+    }).join('');
+    rows.innerHTML = html || '<div class="muted" style="font-size:13px">Thêm token ở Cài đặt → 🪙 Token Binance tùy chỉnh</div>';
+  }
 }
 
 /* ================= GIÁ ================= */
@@ -1064,26 +1080,14 @@ function chartLeave(){
 function render(){
   const b = balances();
   const P = S.prices;
-  const e1V   = (S.qty.e1  || 0) * (P.e1 || 0);
-  const vooV  = (S.qty.voo || 0) * (P.vooUSD || 0) * (P.fx || 0);
-  const usdtV = (S.qty.usdt|| 0) * (P.usdtVND || 0);
-  const usdcV = (S.qty.usdc|| 0) * (P.usdcVND || 0);
   const spend = b.cash + b.tpbank;
-  const invest = e1V + vooV + usdtV + usdcV + customVND();
+  const invest = investTotal();
 
   document.getElementById('total-all').textContent = fmt(spend+invest);
   document.getElementById('total-spend').textContent = fmt(spend);
   document.getElementById('total-invest').textContent = fmt(invest);
   document.getElementById('v-cash').textContent = fmt(b.cash);
   document.getElementById('v-tpbank').textContent = fmt(b.tpbank);
-  document.getElementById('v-e1').textContent = fmt(e1V);
-  document.getElementById('v-voo').textContent = fmt(vooV);
-  document.getElementById('v-usdt').textContent = fmt(usdtV);
-  document.getElementById('v-usdc').textContent = fmt(usdcV);
-  document.getElementById('d-e1').textContent  = `${fmtN(S.qty.e1||0)} ccq × ${P.e1 ? fmtN(P.e1)+' ₫' : '—'}`;
-  document.getElementById('d-voo').textContent = `${fmtN(S.qty.voo||0)} cp × ${P.vooUSD ? '$'+P.vooUSD.toLocaleString('en-US',{maximumFractionDigits:2}) : '—'}`;
-  document.getElementById('d-usdt').textContent = `${fmtN(S.qty.usdt||0)} × ${P.usdtVND ? fmtN(Math.round(P.usdtVND))+' ₫' : '—'}`;
-  document.getElementById('d-usdc').textContent = `${fmtN(S.qty.usdc||0)} × ${P.usdcVND ? fmtN(Math.round(P.usdcVND))+' ₫' : '—'}`;
   document.getElementById('fx-note').textContent =
     `Tỷ giá USD/VND: ${P.fx ? fmtN(Math.round(P.fx)) : '—'}` + (P.updated ? ` · Giá cập nhật ${timeAgo(P.updated)}` : '');
 
@@ -1294,10 +1298,6 @@ function fillSettings(){
   const b = balances();
   document.getElementById('set-cash').value = fmtN(b.cash);
   document.getElementById('set-tpbank').value = fmtN(b.tpbank);
-  document.getElementById('set-e1').value = S.qty.e1||'';
-  document.getElementById('set-voo').value = S.qty.voo||'';
-  document.getElementById('set-usdt').value = S.qty.usdt||'';
-  document.getElementById('set-usdc').value = S.qty.usdc||'';
   if(elKey()){
     document.getElementById('el-key').value = elKey();
     document.getElementById('el-status').textContent = '✅ Giọng AI đang bật.';
@@ -1316,10 +1316,6 @@ function saveSettings(){
   S.opening.cash = parseMoney(document.getElementById('set-cash').value);
   S.opening.tpbank = parseMoney(document.getElementById('set-tpbank').value);
   S.openingSince = new Date().toISOString();
-  S.qty.e1 = parseFloat(document.getElementById('set-e1').value)||0;
-  S.qty.voo = parseFloat(document.getElementById('set-voo').value)||0;
-  S.qty.usdt = parseFloat(document.getElementById('set-usdt').value)||0;
-  S.qty.usdc = parseFloat(document.getElementById('set-usdc').value)||0;
   save(); render();
   alert('Đã lưu số dư!');
 }
