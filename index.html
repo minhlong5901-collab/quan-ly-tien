@@ -670,6 +670,14 @@ function removeToken(i){
   if(!confirm('Xóa '+S.custom[i].sym+' khỏi danh mục?')) return;
   S.custom.splice(i,1); save(); render();
 }
+// cộng/trừ số lượng token (dùng khi nạp/rút Binance) — tạo mới nếu chưa có
+function adjustToken(sym, delta){
+  sym = sym.toUpperCase();
+  S.custom = S.custom || [];
+  let c = S.custom.find(x=>x.sym.toUpperCase()===sym);
+  if(!c){ c = {sym, qty:0, price: sym==='USDT'?1:0}; S.custom.push(c); }
+  c.qty = Math.max(0, Math.round(((c.qty||0)+delta)*1e8)/1e8);
+}
 function saveTokens(){
   (S.custom||[]).forEach((c,i)=>{
     const el = document.getElementById('tokqty-'+i);
@@ -1007,24 +1015,21 @@ function fmtShort(n){
   return String(Math.round(n));
 }
 function buildDailySeries(){
-  const h = S.history||{};
-  const snapKeys = Object.keys(h).filter(k=>typeof h[k]==='object').sort();
-  const txDates = S.tx.map(x=>x.date);
   const today = todayStr();
-  const all = [...snapKeys, ...txDates].sort();
-  if(!all.length) return [];
-  const start = all[0];
-  // hiệu ứng từng ngày lên "tiền chi tiêu" (noibo không đổi tổng)
-  const eff = {};
+  const txDates = S.tx.map(x=>x.date);
+  if(!txDates.length) return [];
+  const start = txDates.sort()[0];
+  // hiệu ứng mỗi ngày: chi tiêu (spend) và đầu tư (invest) — dựng NGƯỢC từ giao dịch nên luôn ổn định
+  const effS = {}, effI = {};
   for(const x of S.tx){
-    let e = 0;
-    if(x.type==='chi') e = -x.amount;
-    else if(x.type==='thu') e = x.amount;
-    else if(x.type==='chuyen') e = (x.direction==='toBinance') ? -x.amount : x.amount;
-    else continue;
-    eff[x.date] = (eff[x.date]||0) + e;
+    if(x.type==='chi') effS[x.date] = (effS[x.date]||0) - x.amount;
+    else if(x.type==='thu') effS[x.date] = (effS[x.date]||0) + x.amount;
+    else if(x.type==='chuyen'){
+      if(x.direction==='toBinance'){ effS[x.date]=(effS[x.date]||0)-x.amount; effI[x.date]=(effI[x.date]||0)+x.amount; } // tiền rời ví, vào đầu tư
+      else { effS[x.date]=(effS[x.date]||0)+x.amount; effI[x.date]=(effI[x.date]||0)-x.amount; }
+    }
+    // noibo: chuyển ví, tổng spend không đổi -> bỏ qua
   }
-  // danh sách ngày từ start -> hôm nay (tối đa 120 ngày)
   const days = [];
   for(let d = new Date(today); ; d.setDate(d.getDate()-1)){
     const ds = d.toISOString().slice(0,10);
@@ -1032,23 +1037,14 @@ function buildDailySeries(){
     if(ds <= start || days.length >= 120) break;
   }
   days.reverse();
-  // đi lùi từ số dư hiện tại để có tiền chi tiêu cuối mỗi ngày (chính xác theo giao dịch)
-  let run = spendTotal();
-  const spendMap = {};
+  let runS = spendTotal(), runI = investTotal();
+  const out = [];
   for(let i = days.length-1; i >= 0; i--){
-    spendMap[days[i]] = run;
-    run -= (eff[days[i]]||0);
+    out[i] = {k:days[i], s:Math.round(runS), i:Math.round(runI)};
+    runS -= (effS[days[i]]||0);
+    runI -= (effI[days[i]]||0);
   }
-  // đầu tư: lấy theo snapshot giá gần nhất trước đó; hôm nay dùng giá trị hiện tại
-  const curInvest = investTotal();
-  return days.map(ds=>{
-    let inv = null;
-    for(let i=snapKeys.length-1; i>=0; i--){ if(snapKeys[i] <= ds){ inv = h[snapKeys[i]].i; break; } }
-    if(inv===null) inv = snapKeys.length ? h[snapKeys[0]].i : curInvest;
-    if(ds === today) inv = curInvest;
-    const s = Math.round(spendMap[ds]), iv = Math.round(inv);
-    return {k:ds, s, i:iv, t:s+iv};
-  });
+  return out.map(o=>({...o, t:o.s+o.i}));
 }
 function renderHistory(){
   const listEl = document.getElementById('hist-list');
@@ -1296,6 +1292,8 @@ function addTransfer(){
   };
   if(rate > 0){ tx.rate = rate; tx.usdt = Math.round(amount/rate*100)/100; }
   S.tx.push(tx);
+  // tự cộng/trừ token USDT trong danh mục đầu tư (giữ tổng tài sản không nhảy)
+  if(tx.usdt){ adjustToken('USDT', direction==='toBinance' ? tx.usdt : -tx.usdt); }
   save();
   document.getElementById('tf-amount').value=''; document.getElementById('tf-note').value='';
   document.getElementById('tf-rate').value=''; document.getElementById('tf-preview').textContent='';
