@@ -1528,6 +1528,8 @@ function chatPush(r, t){
   localStorage.setItem('qlt-chat', JSON.stringify(chatHist));
   renderChat();
 }
+let chatTyping = false;
+function setTyping(on){ chatTyping = on; renderChat(); }
 function renderChat(){
   const el = document.getElementById('chat-msgs');
   if(!el) return;
@@ -1535,6 +1537,7 @@ function renderChat(){
     ? `<div style="align-self:flex-end;background:linear-gradient(135deg,rgba(56,189,248,.35),rgba(129,140,248,.35));padding:9px 13px;border-radius:14px 14px 4px 14px;max-width:82%;font-size:14px;line-height:1.5">${m.t}</div>`
     : `<div style="align-self:flex-start;background:var(--card2);padding:9px 13px;border-radius:14px 14px 14px 4px;max-width:82%;font-size:14px;line-height:1.5">${m.t}</div>`
   ).join('') || '<div class="muted" style="font-size:13px;text-align:center;margin-top:30px">Dạ em chào sếp! Nhắn tin hoặc bấm 🎤 để trò chuyện, hỏi thống kê, hay ra lệnh ghi chi tiêu ạ 💕</div>';
+  if(chatTyping) el.innerHTML += '<div class="muted" style="align-self:flex-start;background:var(--card2);padding:9px 13px;border-radius:14px 14px 14px 4px;font-size:14px"><i>Bé đang suy nghĩ...</i></div>';
   el.scrollTop = el.scrollHeight;
 }
 function toggleChat(){
@@ -1879,6 +1882,24 @@ Action hợp lệ (source/from/to = "id" của ví trong DATA.wallets, chọn th
 - "price_update" | "backup" | "download" | "lock" | "close" : params {}
 - "answer": trả lời/thống kê/trò chuyện — TỰ TÍNH CHÍNH XÁC từ DATA.tx (mảng giao dịch: d=ngày, t=loại chi/thu/chuyen/noibo, a=số tiền, c=danh mục), đưa kết quả vào "say".
 Quy tắc: "45k"=45000, "2 triệu rưỡi"=2500000. Ngày nói thiếu năm → năm gần nhất chưa qua. Thiếu số tiền → action "answer", "say" hỏi lại lịch sự. Với expense/income/atm/transfer: "say" = "Em điền xong rồi, sếp kiểm tra và xác nhận giúp em ạ!".`;
+// giải mã đầu ra AI: JSON hỏng kiểu gì cũng moi được câu trả lời, không bao giờ vỡ
+function parseAIOut(out){
+  let s = String(out).replace(/```json/gi,'').replace(/```/g,'').trim();
+  try{ return JSON.parse(s); }catch(e){}
+  const start = s.indexOf('{');
+  if(start >= 0){
+    let depth = 0;
+    for(let i=start; i<s.length; i++){
+      if(s[i]==='{') depth++;
+      else if(s[i]==='}'){ depth--; if(depth===0){ try{ return JSON.parse(s.slice(start, i+1)); }catch(e){} break; } }
+    }
+    const m = s.match(/"say"\s*:\s*"([^"]+)/);
+    if(m) return {action:'answer', params:{}, say:m[1]};
+  }
+  // AI trả lời bằng chữ thường -> coi luôn đó là câu trả lời
+  const plain = s.replace(/[{}"\[\]]/g,' ').replace(/\s+/g,' ').trim();
+  return {action:'answer', params:{}, say: plain.slice(0,300) || 'Dạ em nghe chưa rõ, sếp nói lại giúp em ạ!'};
+}
 let aiLast = null;
 async function aiHandle(text){
   const m = balances();
@@ -1893,8 +1914,7 @@ async function aiHandle(text){
   if(hist.length) prompt += '\nHội thoại gần đây:\n'+hist.join('\n');
   prompt += `\nSếp vừa nói: "${text}"`;
   const out = await askGemini(prompt);
-  let obj;
-  try{ obj = JSON.parse(out); }catch(e){ obj = JSON.parse(out.match(/\{[\s\S]*\}/)[0]); }
+  const obj = parseAIOut(out);
   const p = obj.params || {};
   const say = obj.say || 'Dạ xong rồi ạ!';
   aiLast = {u:text, s:say};
@@ -1938,9 +1958,12 @@ async function aiHandle(text){
 let pendingVoice = null; // câu hỏi làm rõ đang chờ sếp trả lời (chế độ luật cơ bản)
 async function handleVoice(text){
   if(gemKey() && !pendingVoice){
-    toast('🤖 <i>Bé đang suy nghĩ...</i>', 4000);
-    try{ await aiHandle(text); return; }
-    catch(e){ toast('🤖 Hic, não AI đang lỗi ('+String(e&&e.message||e).slice(0,90)+') — em tạm dùng bộ luật cơ bản ạ. Sếp vào Cài đặt bấm "🔎 Kiểm tra AI" xem chi tiết nha.', 6000); }
+    setTyping(true);
+    try{ await aiHandle(text); setTyping(false); return; }
+    catch(e){
+      setTyping(false);
+      toast('🤖 Hic, não AI đang lỗi ('+String(e&&e.message||e).slice(0,90)+') — em tạm dùng bộ luật cơ bản ạ.', 6000);
+    }
   }
   handleVoiceRules(text);
 }
