@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Quản Lý Tài Sản - Chủ Tịch Long</title>
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -68,11 +68,13 @@
   button.ghost{background:var(--card2);color:var(--text);border:1px solid var(--border);box-shadow:none}
   button.small{padding:6px 12px;font-size:12px;border-radius:10px}
   button.danger{background:linear-gradient(135deg,#f43f5e,#e11d48);box-shadow:0 6px 16px rgba(244,63,94,.25)}
+  html,body{touch-action:manipulation} /* chặn double-tap zoom */
   input,select{
     background:rgba(20,29,49,.85);border:1px solid var(--border);color:var(--text);
-    border-radius:12px;padding:11px 12px;font-size:14px;width:100%;
+    border-radius:12px;padding:11px 12px;font-size:16px;width:100%; /* 16px để iOS không tự zoom khi gõ */
     transition:border-color .15s ease, box-shadow .15s ease;
   }
+  .rec-dot{width:10px;height:10px;border-radius:50%;background:#f43f5e;animation:nghe 1s ease-in-out infinite;flex-shrink:0}
   input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,189,248,.18)}
   input::placeholder{color:#5b6b8a}
   label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;font-weight:500}
@@ -423,6 +425,9 @@
     <input id="chat-input" placeholder="Nhắn cho bé trợ lý hoặc ra lệnh..." style="flex:1" onkeydown="if(event.key==='Enter')sendChat()">
     <button onclick="sendChat()" style="width:64px;padding:0">Gửi</button>
   </div>
+</div>
+<div id="rec-banner" style="position:fixed;left:50%;bottom:152px;transform:translateX(-50%);z-index:65;display:none;align-items:center;gap:9px;background:rgba(244,63,94,.18);border:1px solid rgba(244,63,94,.55);color:#fecdd3;border-radius:20px;padding:9px 18px;font-size:13px;font-weight:700;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)">
+  <span class="rec-dot"></span> Đang ghi âm... nói xong tự gửi
 </div>
 <button id="chat-btn" class="ghost" onclick="toggleChat()" title="Chat với bé trợ lý"
   style="position:fixed;right:23px;bottom:156px;width:44px;height:44px;border-radius:50%;font-size:18px;z-index:60;padding:0">💬</button>
@@ -2204,9 +2209,9 @@ function startVoice(){
   recog = new SR();
   recog.lang = 'vi-VN'; recog.interimResults = false; recog.maxAlternatives = 1;
   const btn = document.getElementById('voice-btn');
-  const done = ()=>{ listening=false; btn.classList.remove('listening'); };
-  recog.onstart = ()=>{ listening=true; btn.classList.add('listening');
-    toast('🎤 Em đang nghe sếp nè... VD: <b>"chi 45k ăn uống"</b> · <b>"rút 2 triệu về ngân hàng"</b> · <b>"mở báo cáo"</b> · <b>"tổng tài sản?"</b> · <b>"xong rồi, đóng app"</b>', 7000); };
+  const banner = document.getElementById('rec-banner');
+  const done = ()=>{ listening=false; btn.classList.remove('listening'); if(banner) banner.style.display='none'; };
+  recog.onstart = ()=>{ listening=true; btn.classList.add('listening'); if(banner) banner.style.display='flex'; };
   recog.onend = done;
   recog.onerror = e=>{ done();
     if(e.error==='not-allowed') toast('⚠️ Hãy bấm Cho phép (Allow) khi trình duyệt hỏi quyền micro.', 5000);
