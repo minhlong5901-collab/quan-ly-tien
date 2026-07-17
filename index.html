@@ -316,13 +316,14 @@
 
     <div class="card">
       <h2>🪙 Token Binance tùy chỉnh</h2>
-      <div id="token-list" class="flex" style="margin-bottom:10px"></div>
+      <div id="token-list"></div>
+      <div style="margin-top:14px"><button onclick="saveTokens()" style="width:100%">Lưu số lượng token</button></div>
+      <h3>Thêm token mới</h3>
       <div class="grid2">
         <div><label>Mã token (VD: BTC, ETH)</label><input type="text" id="tok-sym" placeholder="BTC" autocapitalize="characters"></div>
         <div><label>Số lượng nắm giữ</label><input type="number" id="tok-qty" step="any" placeholder="0.05"></div>
       </div>
-      <div style="margin-top:12px"><button class="ghost" onclick="addToken()" style="width:100%">＋ Thêm / cập nhật token</button></div>
-      <div class="detail muted" style="margin-top:6px">App tự lấy giá cặp TOKEN/USDT từ Binance và quy đổi VND khi cập nhật giá.</div>
+      <div style="margin-top:12px"><button class="ghost" onclick="addToken()" style="width:100%">＋ Thêm token</button></div>
     </div>
 
     <div class="card">
@@ -605,11 +606,21 @@ function removeToken(i){
   if(!confirm('Xóa '+S.custom[i].sym+' khỏi danh mục?')) return;
   S.custom.splice(i,1); save(); render();
 }
+function saveTokens(){
+  (S.custom||[]).forEach((c,i)=>{
+    const el = document.getElementById('tokqty-'+i);
+    if(el){ const v = parseFloat(el.value); if(!isNaN(v) && v>=0) c.qty = v; }
+  });
+  save(); render();
+  toast('✅ Đã lưu số lượng token');
+}
 function renderTokens(){
   const el = document.getElementById('token-list');
-  if(el) el.innerHTML = (S.custom||[]).map((c,i)=>
-    `<span class="tag">${c.sym.toUpperCase()} · ${fmtN(c.qty)} <span style="cursor:pointer;color:var(--red)" onclick="removeToken(${i})">✕</span></span>`).join('')
-    || '<span class="muted" style="font-size:12px">Chưa có token nào — thêm bên dưới</span>';
+  if(el) el.innerHTML = (S.custom||[]).map((c,i)=>`
+    <label>${c.sym.toUpperCase()} <span class="muted" style="font-weight:400;text-transform:none">${c.price ? '· '+c.price.toLocaleString('en-US',{maximumFractionDigits:4})+(c.src==='yahoo'?' USD':' USDT') : ''}</span>
+      <span style="float:right;cursor:pointer;color:var(--red)" onclick="removeToken(${i})">✕ xóa</span></label>
+    <input type="number" id="tokqty-${i}" step="any" value="${c.qty||0}">`).join('')
+    || '<div class="muted" style="font-size:12px">Chưa có token nào — thêm bên dưới</div>';
   const rows = document.getElementById('custom-rows');
   if(rows){
     let html = (S.custom||[]).map(c=>{
