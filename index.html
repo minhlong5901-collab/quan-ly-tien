@@ -142,7 +142,7 @@
         </div>
       </div>
       <div class="flex" style="margin-top:14px">
-        <button onclick="refreshPrices(true)" id="btn-refresh">🔄 Cập nhật giá</button>
+        <button onclick="refreshPrices()" id="btn-refresh">🔄 Cập nhật giá</button>
         <span class="status" id="price-status"></span>
       </div>
     </div>
@@ -196,6 +196,7 @@
         <div><div class="name">USDC</div><div class="detail" id="d-usdc">—</div></div>
         <div class="val" id="v-usdc">0 ₫</div>
       </div>
+      <div id="custom-rows"></div>
       <div class="price-note" id="fx-note">Tỷ giá USD/VND: —</div>
     </div>
   </div>
@@ -395,6 +396,28 @@
     </div>
 
     <div class="card">
+      <h2>🧠 Bộ não AI (Google Gemini — miễn phí)</h2>
+      <label>API Key (lấy tại aistudio.google.com → Get API key)</label>
+      <input type="password" id="gem-key" placeholder="AIza..." autocomplete="off">
+      <div class="flex" style="margin-top:12px">
+        <button onclick="saveGem()">Bật AI</button>
+        <button class="danger small" onclick="clearGem()">Tắt AI</button>
+      </div>
+      <div class="status" id="gem-status"></div>
+    </div>
+
+    <div class="card">
+      <h2>🪙 Token Binance tùy chỉnh</h2>
+      <div id="token-list" class="flex" style="margin-bottom:10px"></div>
+      <div class="grid2">
+        <div><label>Mã token (VD: BTC, ETH)</label><input type="text" id="tok-sym" placeholder="BTC" autocapitalize="characters"></div>
+        <div><label>Số lượng nắm giữ</label><input type="number" id="tok-qty" step="any" placeholder="0.05"></div>
+      </div>
+      <div style="margin-top:12px"><button class="ghost" onclick="addToken()" style="width:100%">＋ Thêm / cập nhật token</button></div>
+      <div class="detail muted" style="margin-top:6px">App tự lấy giá cặp TOKEN/USDT từ Binance và quy đổi VND khi cập nhật giá.</div>
+    </div>
+
+    <div class="card">
       <h2>🔒 Khóa app</h2>
       <label>Mã PIN (4–6 số)</label>
       <input type="password" id="set-pin" inputmode="numeric" maxlength="6" placeholder="VD: 1234">
@@ -507,6 +530,59 @@ function balances(){
     if(t.source==='cash') cash += sign*t.amount; else tpbank += sign*t.amount;
   }
   return {cash, tpbank};
+}
+
+/* ================= TOKEN TÙY CHỈNH ================= */
+function customVND(){
+  const r = S.prices.usdtVND || S.prices.fx || 0;
+  return (S.custom||[]).reduce((a,c)=> a + (c.qty||0)*(c.price||0)*r, 0);
+}
+function investTotal(){
+  const P = S.prices;
+  return (S.qty.e1||0)*(P.e1||0) + (S.qty.voo||0)*(P.vooUSD||0)*(P.fx||0)
+       + (S.qty.usdt||0)*(P.usdtVND||0) + (S.qty.usdc||0)*(P.usdcVND||0) + customVND();
+}
+async function getCustomPrices(){
+  const list = S.custom||[];
+  if(!list.length) return;
+  const syms = list.map(c=>c.sym.toUpperCase()+'USDT');
+  const d = await fetchWithProxies('https://data-api.binance.vision/api/v3/ticker/price?symbols='+encodeURIComponent(JSON.stringify(syms)));
+  for(const it of d){
+    const sym = it.symbol.replace(/USDT$/,'');
+    const c = list.find(x=>x.sym.toUpperCase()===sym);
+    if(c) c.price = parseFloat(it.price);
+  }
+}
+async function addToken(){
+  const sym = document.getElementById('tok-sym').value.trim().toUpperCase();
+  const qty = parseFloat(document.getElementById('tok-qty').value);
+  if(!sym || isNaN(qty) || qty < 0){ toast('⚠️ Nhập mã token và số lượng ạ!'); return; }
+  toast('Đang kiểm tra '+sym+' trên Binance...');
+  try{
+    const d = await fetchWithProxies('https://data-api.binance.vision/api/v3/ticker/price?symbol='+sym+'USDT');
+    const price = parseFloat(d.price);
+    S.custom = S.custom||[];
+    const ex = S.custom.find(c=>c.sym.toUpperCase()===sym);
+    if(ex){ ex.qty = qty; ex.price = price; } else S.custom.push({sym, qty, price});
+    save(); render();
+    document.getElementById('tok-sym').value=''; document.getElementById('tok-qty').value='';
+    toast('✅ Đã thêm '+sym+' — giá '+price+' USDT');
+  }catch(e){ toast('❌ Không tìm thấy cặp '+sym+'/USDT trên Binance.'); }
+}
+function removeToken(i){
+  if(!confirm('Xóa '+S.custom[i].sym+' khỏi danh mục?')) return;
+  S.custom.splice(i,1); save(); render();
+}
+function renderTokens(){
+  const el = document.getElementById('token-list');
+  if(el) el.innerHTML = (S.custom||[]).map((c,i)=>
+    `<span class="tag">${c.sym.toUpperCase()} · ${fmtN(c.qty)} <span style="cursor:pointer;color:var(--red)" onclick="removeToken(${i})">✕</span></span>`).join('')
+    || '<span class="muted" style="font-size:12px">Chưa có token nào — thêm bên dưới</span>';
+  const rows = document.getElementById('custom-rows');
+  if(rows) rows.innerHTML = (S.custom||[]).map(c=>{
+    const vnd = (c.qty||0)*(c.price||0)*(S.prices.usdtVND||S.prices.fx||0);
+    return `<div class="row"><div><div class="name">${c.sym.toUpperCase()}</div><div class="detail">${fmtN(c.qty||0)} × ${c.price ? c.price.toLocaleString('en-US',{maximumFractionDigits:4})+' USDT' : '—'}</div></div><div class="val">${fmt(vnd)}</div></div>`;
+  }).join('');
 }
 
 /* ================= GIÁ ================= */
@@ -672,16 +748,16 @@ function schedulePush(){
   pushTimer = setTimeout(pushCloud, 2500);
 }
 
-async function cloudDownload(){
+async function cloudDownload(fromVoice=false){
   if(!S.cloud || !S.cloud.gistId){ cloudStatus('⚠️ Chưa kết nối. Dán token rồi bấm "Kết nối (lần đầu)" trước ạ.'); return; }
   cloudStatus('⬇️ Đang tải dữ liệu đã lưu từ GitHub về...');
   try{
     await pullCloud();
     cloudStatus('✅ Đã tải dữ liệu mới nhất về máy này.');
-    speak('Dạ, em tải dữ liệu về xong rồi ạ!');
+    if(fromVoice) speak('Dạ, em tải dữ liệu về xong rồi ạ!');
   }catch(e){ cloudStatus('❌ Lỗi tải: '+e.message); }
 }
-async function cloudBackup(){
+async function cloudBackup(fromVoice=false){
   if(!S.cloud || !S.cloud.gistId){ cloudStatus('⚠️ Chưa kết nối. Dán token rồi bấm "Kết nối (lần đầu)" trước ạ.'); return; }
   cloudStatus('⬆️ Đang sao lưu lên GitHub...');
   const before = S.cloud.lastSync;
@@ -689,7 +765,7 @@ async function cloudBackup(){
   await pushCloud();
   if(S.cloud.lastSync !== before){
     cloudStatus('✅ Đã sao lưu toàn bộ dữ liệu lên GitHub an toàn · '+timeAgo(S.cloud.lastSync));
-    speak('Dạ, em sao lưu xong rồi, sếp yên tâm nha!');
+    if(fromVoice) speak('Dạ, em sao lưu xong rồi, sếp yên tâm nha!');
   }
 }
 
@@ -707,7 +783,8 @@ async function refreshPrices(announce=false){
   btn.disabled = true; st.textContent = 'Đang cập nhật giá...';
   const results = [];
 
-  const [fx, voo, e1, crypto] = await Promise.allSettled([getFX(), getVOO(), getE1(), getCrypto()]);
+  const [fx, voo, e1, crypto, cust] = await Promise.allSettled([getFX(), getVOO(), getE1(), getCrypto(), getCustomPrices()]);
+  if((S.custom||[]).length) results.push(cust.status==='fulfilled' ? '✅ Token' : '⚠️ Token lỗi');
 
   if(fx.status==='fulfilled'){ S.prices.fx = fx.value; results.push('✅ Tỷ giá'); }
   else results.push('⚠️ Tỷ giá lỗi' + (S.prices.fx ? ' (dùng giá cũ)' : ''));
@@ -859,8 +936,7 @@ function buildDailySeries(){
     run -= (eff[days[i]]||0);
   }
   // đầu tư: lấy theo snapshot giá gần nhất trước đó; hôm nay dùng giá trị hiện tại
-  const P = S.prices;
-  const curInvest = (S.qty.e1||0)*(P.e1||0) + (S.qty.voo||0)*(P.vooUSD||0)*(P.fx||0) + (S.qty.usdt||0)*(P.usdtVND||0) + (S.qty.usdc||0)*(P.usdcVND||0);
+  const curInvest = investTotal();
   return days.map(ds=>{
     let inv = null;
     for(let i=snapKeys.length-1; i>=0; i--){ if(snapKeys[i] <= ds){ inv = h[snapKeys[i]].i; break; } }
@@ -993,7 +1069,7 @@ function render(){
   const usdtV = (S.qty.usdt|| 0) * (P.usdtVND || 0);
   const usdcV = (S.qty.usdc|| 0) * (P.usdcVND || 0);
   const spend = b.cash + b.tpbank;
-  const invest = e1V + vooV + usdtV + usdcV;
+  const invest = e1V + vooV + usdtV + usdcV + customVND();
 
   document.getElementById('total-all').textContent = fmt(spend+invest);
   document.getElementById('total-spend').textContent = fmt(spend);
@@ -1014,6 +1090,7 @@ function render(){
   renderAllocation(spend, invest);
   if(P.updated) recordHistory(spend, invest); // chỉ ghi lịch sử khi đã có giá
   renderHistory();
+  renderTokens();
   renderTodayTx();
   renderCats();
   renderCatList();
@@ -1075,7 +1152,7 @@ function addExpense(){
   document.getElementById('exp-amount').value=''; document.getElementById('exp-note').value='';
   render();
   const msg = `Đã trừ ${fmt(amount)} từ ${selSrc==='cash'?'tiền mặt':'TPBank'}`;
-  toast('✅ '+msg+' <span class="muted">· ☁️ tự sao lưu</span>'); speak('Dạ, em lưu xong rồi ạ!');
+  toast('✅ '+msg+' <span class="muted">· ☁️ tự sao lưu</span>');
 }
 function addIncome(){
   const amount = parseMoney(document.getElementById('inc-amount').value);
@@ -1087,7 +1164,7 @@ function addIncome(){
   document.getElementById('inc-amount').value=''; document.getElementById('inc-note').value='';
   render();
   const msg = `Đã cộng ${fmt(amount)} vào ${source==='cash'?'tiền mặt':'TPBank'}`;
-  toast('✅ '+msg); speak('Dạ, em lưu xong rồi, chúc mừng sếp nha!');
+  toast('✅ '+msg+' <span class="muted">· ☁️ tự sao lưu</span>');
 }
 function addATM(){
   const amount = parseMoney(document.getElementById('atm-amount').value);
@@ -1107,7 +1184,7 @@ function addATM(){
   const msg = dir==='ruttien'
     ? `Đã chuyển ${fmt(amount)} từ TPBank ra tiền mặt`
     : `Đã chuyển ${fmt(amount)} tiền mặt vào TPBank`;
-  toast('✅ '+msg+' <span class="muted">· ☁️ tự sao lưu</span>'); speak('Dạ, em lưu xong rồi ạ!');
+  toast('✅ '+msg+' <span class="muted">· ☁️ tự sao lưu</span>');
 }
 function tfDirChanged(){
   const d = document.getElementById('tf-dir').value;
@@ -1148,7 +1225,7 @@ function addTransfer(){
   const msg = direction==='toBinance'
     ? `Đã trừ ${fmt(amount)} từ ${srcName}, chuyển vào Binance để đầu tư${usdtInfo}`
     : `Đã cộng ${fmt(amount)} vào ${srcName}, rút từ Binance về${usdtInfo}`;
-  toast('✅ '+msg+' <span class="muted">· ☁️ tự sao lưu</span>'); speak('Dạ, em lưu xong rồi ạ!');
+  toast('✅ '+msg+' <span class="muted">· ☁️ tự sao lưu</span>');
 }
 function deleteTx(id){
   if(!confirm('Xóa giao dịch này? Số dư sẽ được hoàn lại.')) return;
@@ -1224,6 +1301,10 @@ function fillSettings(){
   if(elKey()){
     document.getElementById('el-key').value = elKey();
     document.getElementById('el-status').textContent = '✅ Giọng AI đang bật.';
+  }
+  if(gemKey()){
+    document.getElementById('gem-key').value = gemKey();
+    gemStatus('✅ Bộ não AI đang bật.');
   }
   if(S.cloud && S.cloud.token){
     document.getElementById('gh-token').value = S.cloud.token;
@@ -1310,7 +1391,6 @@ async function enablePin(){
   localStorage.setItem('qlt-lock-pin', await sha256(pin));
   document.getElementById('set-pin').value='';
   lockStatus('✅ Đã bật khóa PIN — mỗi lần mở app sẽ hỏi mã.');
-  speak('Dạ, em bật khóa app rồi ạ!');
 }
 async function enableBio(){
   if(!lockPinHash()){ lockStatus('⚠️ Bật PIN trước để dự phòng, rồi bật Face ID ạ.'); return; }
@@ -1325,7 +1405,6 @@ async function enableBio(){
     }});
     localStorage.setItem('qlt-lock-bio', btoa(String.fromCharCode(...new Uint8Array(cred.rawId))));
     lockStatus('✅ Đã bật Face ID / vân tay.');
-    speak('Dạ, em bật Face ID rồi ạ!');
   }catch(e){ lockStatus('❌ Không bật được ('+e.message+').'); }
 }
 function disableLock(){
@@ -1639,8 +1718,110 @@ function fillTransfer(direction, amount, source, date, rate, note){
   confirmFill((direction==='toBinance' ? `Đã điền nạp ${fmt(amount)} vào Binance để đầu tư` : `Đã điền rút ${fmt(amount)} từ Binance về ${source==='cash'?'tiền mặt':'TPBank'}`) + (rate?`, giá ${fmtN(rate)}`:''));
 }
 
-let pendingVoice = null; // câu hỏi làm rõ đang chờ sếp trả lời
-function handleVoice(text){
+/* ================= BỘ NÃO AI (GEMINI) ================= */
+const gemKey = ()=> localStorage.getItem('qlt-gem-key') || '';
+function gemStatus(m){ const el=document.getElementById('gem-status'); if(el) el.textContent=m; }
+function saveGem(){
+  const k = document.getElementById('gem-key').value.trim();
+  if(!k){ gemStatus('⚠️ Dán API key trước ạ.'); return; }
+  localStorage.setItem('qlt-gem-key', k);
+  gemStatus('✅ Đã bật bộ não AI — bấm 🎤 nói gì cũng hiểu.');
+}
+function clearGem(){ localStorage.removeItem('qlt-gem-key'); document.getElementById('gem-key').value=''; gemStatus('Đã tắt AI, dùng bộ luật cơ bản.'); }
+async function askGemini(prompt){
+  const models = ['gemini-2.5-flash','gemini-2.0-flash'];
+  let lastE;
+  for(const m of models){
+    try{
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${gemKey()}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.4, response_mime_type:'application/json'}}),
+        signal: AbortSignal.timeout(25000)
+      });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const d = await r.json();
+      return d.candidates[0].content.parts[0].text;
+    }catch(e){ lastE=e; }
+  }
+  throw lastE;
+}
+const AI_SYS = `Bạn là "bé trợ lý" trong app quản lý tài chính cá nhân của sếp Long. Tính cách: dễ thương, lễ phép, xưng "em" gọi "sếp", câu ngắn gọn.
+Phân tích câu sếp nói và trả về DUY NHẤT một JSON (không markdown):
+{"action":"...","params":{...},"say":"câu ngắn để đọc cho sếp"}
+Action hợp lệ:
+- "expense" ghi khoản chi: params {amount:số VND, category:đúng 1 danh mục trong DATA, source:"cash"|"tpbank", date:"YYYY-MM-DD", note:""}
+- "income" khoản thu: {amount, source, note}
+- "atm": {direction:"ruttien"(TPBank→tiền mặt)|"noptien"(ngược lại), amount, date, note}
+- "transfer" chuyển với Binance: {direction:"toBinance"|"fromBinance", amount:VND, source, date, rate:giá USDT hoặc 0, note}
+- "filter" lọc chi tiêu: {from:"YYYY-MM-DD", to:"YYYY-MM-DD", category:""|tên danh mục}
+- "report": {month:"YYYY-MM"} | "navigate": {target:"tongquan"|"chitieu"|"biendong"|"caidat"}
+- "price_update" | "backup" | "download" | "lock" | "close" : params {}
+- "answer": trả lời/thống kê/trò chuyện — TỰ TÍNH CHÍNH XÁC từ DATA.tx (mảng giao dịch: d=ngày, t=loại chi/thu/chuyen/noibo, a=số tiền, c=danh mục), đưa kết quả vào "say".
+Quy tắc: "45k"=45000, "2 triệu rưỡi"=2500000. Ngày nói thiếu năm → năm gần nhất chưa qua. Thiếu số tiền → action "answer", "say" hỏi lại lịch sự. Với expense/income/atm/transfer: "say" = "Em điền xong rồi, sếp kiểm tra và xác nhận giúp em ạ!".`;
+let aiLast = null;
+async function aiHandle(text){
+  const b = balances();
+  const ctx = {
+    today: todayStr(), categories: S.categories,
+    cash: Math.round(b.cash), tpbank: Math.round(b.tpbank), invest: Math.round(investTotal()),
+    tx: S.tx.slice(-150).map(x=>({d:x.date, t:x.type, a:x.amount, c:x.category, n:x.note||''}))
+  };
+  let prompt = AI_SYS + '\nDATA:' + JSON.stringify(ctx);
+  if(aiLast) prompt += `\n(Lượt trước sếp nói: "${aiLast.u}" — em đã đáp: "${aiLast.s}")`;
+  prompt += `\nSếp vừa nói: "${text}"`;
+  const out = await askGemini(prompt);
+  let obj;
+  try{ obj = JSON.parse(out); }catch(e){ obj = JSON.parse(out.match(/\{[\s\S]*\}/)[0]); }
+  const p = obj.params || {};
+  const say = obj.say || 'Dạ xong rồi ạ!';
+  aiLast = {u:text, s:say};
+  const date = p.date || todayStr();
+  switch(obj.action){
+    case 'expense': fillExpense(p.amount, S.categories.includes(p.category)?p.category:(guessCategory(p.category||'')||'Khác'), p.source||'cash', date, p.note||''); break;
+    case 'income': fillIncome(p.amount, p.source||'tpbank', p.note||''); break;
+    case 'atm': fillATM(p.direction||'ruttien', p.amount, date, p.note||''); break;
+    case 'transfer': fillTransfer(p.direction||'toBinance', p.amount, p.source||'tpbank', date, p.rate||0, p.note||''); break;
+    case 'filter':
+      document.querySelectorAll('.tabs button')[2].click();
+      document.getElementById('flt-from').value = p.from || todayStr().slice(0,8)+'01';
+      document.getElementById('flt-to').value = p.to || todayStr();
+      renderCatList();
+      document.getElementById('flt-cat').value = S.categories.includes(p.category)?p.category:'';
+      runFilter(false); toast('🤖 '+say, 7000); speak(say);
+      setTimeout(()=>document.getElementById('flt-result').scrollIntoView({behavior:'smooth', block:'center'}), 300);
+      break;
+    case 'report':
+      document.querySelectorAll('.tabs button')[2].click();
+      if(p.month) document.getElementById('report-month').value = p.month;
+      renderReport(); toast('📊 '+say); speak(say);
+      break;
+    case 'navigate': {
+      const map = {tongquan:0, chitieu:1, biendong:2, caidat:3};
+      document.querySelectorAll('.tabs button')[map[p.target] ?? 0].click();
+      toast('🤖 '+say); speak(say); break;
+    }
+    case 'price_update': refreshPrices(true); toast('🔄 '+say); speak(say); break;
+    case 'backup': cloudBackup(true); break;
+    case 'download': cloudDownload(true); break;
+    case 'lock': speak(say); showLock(); break;
+    case 'close':
+      speak(say); toast('👋 '+say);
+      try{ if(S.cloud && S.cloud.gistId){ clearTimeout(pushTimer); pushCloud(); } }catch(e){}
+      setTimeout(()=>{ window.close(); }, 3000);
+      break;
+    default: toast('🤖 '+say, 8000); speak(say);
+  }
+}
+let pendingVoice = null; // câu hỏi làm rõ đang chờ sếp trả lời (chế độ luật cơ bản)
+async function handleVoice(text){
+  if(gemKey() && !pendingVoice){
+    toast('🤖 <i>Bé đang suy nghĩ...</i>', 4000);
+    try{ await aiHandle(text); return; }
+    catch(e){ toast('⚠️ AI lỗi ('+(e&&e.message||e)+') — dùng bộ luật cơ bản.', 3000); }
+  }
+  handleVoiceRules(text);
+}
+function handleVoiceRules(text){
   const t = stripVN(text);
   // ===== 0. ĐANG CHỜ SẾP TRẢ LỜI CÂU HỎI LÀM RÕ =====
   if(pendingVoice){
@@ -1677,8 +1858,8 @@ function handleVoice(text){
     toast('🤖 '+msg); speak(msg); return;
   }
   if(/(tong tai san|tai san (cua toi|bao nhieu|hien tai|the nao)|toi co bao nhieu tien)/.test(t)){
-    const b = balances(), P = S.prices;
-    const invest = (S.qty.e1||0)*(P.e1||0) + (S.qty.voo||0)*(P.vooUSD||0)*(P.fx||0) + (S.qty.usdt||0)*(P.usdtVND||0) + (S.qty.usdc||0)*(P.usdcVND||0);
+    const b = balances();
+    const invest = investTotal();
     const spend = b.cash + b.tpbank;
     const msg = `Dạ thưa sếp, tổng tài sản của sếp là ${fmt(spend+invest)} ạ. Trong đó tiền chi tiêu ${fmt(spend)}, tiền đầu tư ${fmt(invest)} ạ.`;
     toast('🤖 '+msg); speak(msg); return;
@@ -1747,8 +1928,8 @@ function handleVoice(text){
     else { toast('🤖 Sếp chưa đặt mã PIN — vào Cài đặt → Khóa app để bật trước ạ.'); speak('Sếp chưa đặt mã khóa ạ'); }
     return;
   }
-  if(/sao luu/.test(t)){ document.querySelectorAll('.tabs button')[3].click(); cloudBackup(); return; }
-  if(/(tai|lay|keo) du lieu/.test(t)){ document.querySelectorAll('.tabs button')[3].click(); cloudDownload(); return; }
+  if(/sao luu/.test(t)){ document.querySelectorAll('.tabs button')[3].click(); cloudBackup(true); return; }
+  if(/(tai|lay|keo) du lieu/.test(t)){ document.querySelectorAll('.tabs button')[3].click(); cloudDownload(true); return; }
   // BỘ LỌC bằng giọng nói: "lọc ăn uống từ ngày 1 đến ngày 15", "lọc chi tiêu tháng này"
   if(t.includes('loc') && (/tu ngay|den ngay|toi ngay|thang nay|thang \d/.test(t) || S.categories.some(c=>t.includes(stripVN(c))))){
     const ym = todayStr().slice(0,7);
