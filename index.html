@@ -381,6 +381,7 @@
       <input type="password" id="gem-key" placeholder="AIza..." autocomplete="off">
       <div class="flex" style="margin-top:12px">
         <button onclick="saveGem()">Bật AI</button>
+        <button class="ghost" onclick="testGem()">🔎 Kiểm tra AI</button>
         <button class="danger small" onclick="clearGem()">Tắt AI</button>
       </div>
       <div class="status" id="gem-status"></div>
@@ -410,6 +411,21 @@
   </div>
 </div>
 
+<div id="chat-panel" style="position:fixed;inset:0;z-index:90;background:rgba(8,13,28,.97);display:none;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)">
+    <img src="tro-ly.png" alt="" onerror="this.style.display='none'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid rgba(56,189,248,.5)">
+    <b style="flex:1">Bé trợ lý 💬</b>
+    <button class="ghost small" onclick="toggleChat()">✕ Đóng</button>
+  </div>
+  <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px"></div>
+  <div style="display:flex;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--border)">
+    <button class="ghost" style="width:48px;padding:0;font-size:18px" onclick="startVoice()">🎤</button>
+    <input id="chat-input" placeholder="Nhắn cho bé trợ lý hoặc ra lệnh..." style="flex:1" onkeydown="if(event.key==='Enter')sendChat()">
+    <button onclick="sendChat()" style="width:64px;padding:0">Gửi</button>
+  </div>
+</div>
+<button id="chat-btn" class="ghost" onclick="toggleChat()" title="Chat với bé trợ lý"
+  style="position:fixed;right:23px;bottom:156px;width:44px;height:44px;border-radius:50%;font-size:18px;z-index:60;padding:0">💬</button>
 <button id="voice-btn" onclick="startVoice()" title="Gọi bé trợ lý"
   style="position:fixed;right:16px;bottom:88px;width:58px;height:58px;border-radius:50%;font-size:24px;z-index:60;padding:0;box-shadow:0 8px 26px rgba(56,189,248,.5);overflow:hidden">
   <span id="voice-emoji">🎤</span>
@@ -1496,10 +1512,44 @@ document.addEventListener('visibilitychange', ()=>{
 /* ================= ĐIỀU KHIỂN GIỌNG NÓI ================= */
 let recog = null, listening = false;
 function toast(msg, ms=3500){
+  const s = String(msg);
+  if(/^(🤖|📝|👋)/.test(s)) chatPush('a', s.replace(/^(🤖|📝|👋)\s*/,'')); // lời bé nói -> lưu vào hộp chat
   const el = document.getElementById('toast');
   el.innerHTML = `<img src="tro-ly.png" alt="" onerror="this.remove()" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(56,189,248,.5)"><div>${msg}</div>`;
   el.style.display='flex';
   clearTimeout(el._t); el._t = setTimeout(()=>el.style.display='none', ms);
+}
+/* ================= HỘP CHAT VỚI BÉ TRỢ LÝ ================= */
+let chatHist = [];
+try{ chatHist = JSON.parse(localStorage.getItem('qlt-chat')||'[]'); }catch(e){}
+function chatPush(r, t){
+  chatHist.push({r, t: String(t)});
+  chatHist = chatHist.slice(-30);
+  localStorage.setItem('qlt-chat', JSON.stringify(chatHist));
+  renderChat();
+}
+function renderChat(){
+  const el = document.getElementById('chat-msgs');
+  if(!el) return;
+  el.innerHTML = chatHist.map(m=> m.r==='u'
+    ? `<div style="align-self:flex-end;background:linear-gradient(135deg,rgba(56,189,248,.35),rgba(129,140,248,.35));padding:9px 13px;border-radius:14px 14px 4px 14px;max-width:82%;font-size:14px;line-height:1.5">${m.t}</div>`
+    : `<div style="align-self:flex-start;background:var(--card2);padding:9px 13px;border-radius:14px 14px 14px 4px;max-width:82%;font-size:14px;line-height:1.5">${m.t}</div>`
+  ).join('') || '<div class="muted" style="font-size:13px;text-align:center;margin-top:30px">Dạ em chào sếp! Nhắn tin hoặc bấm 🎤 để trò chuyện, hỏi thống kê, hay ra lệnh ghi chi tiêu ạ 💕</div>';
+  el.scrollTop = el.scrollHeight;
+}
+function toggleChat(){
+  const p = document.getElementById('chat-panel');
+  const open = p.style.display !== 'flex';
+  p.style.display = open ? 'flex' : 'none';
+  if(open){ renderChat(); setTimeout(()=>document.getElementById('chat-input').focus(), 100); }
+}
+function sendChat(){
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if(!text) return;
+  inp.value = '';
+  chatPush('u', escapeHtml(text));
+  handleVoice(text);
 }
 // chọn giọng đọc tiếng Việt tốt nhất có trên máy (ưu tiên giọng sếp đã chọn)
 let viVoice = null;
@@ -1785,7 +1835,7 @@ function saveGem(){
 }
 function clearGem(){ localStorage.removeItem('qlt-gem-key'); document.getElementById('gem-key').value=''; gemStatus('Đã tắt AI, dùng bộ luật cơ bản.'); }
 async function askGemini(prompt){
-  const models = ['gemini-2.5-flash','gemini-2.0-flash'];
+  const models = ['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-flash-latest','gemini-1.5-flash'];
   let lastE;
   for(const m of models){
     try{
@@ -1794,12 +1844,27 @@ async function askGemini(prompt){
         body: JSON.stringify({contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.4, response_mime_type:'application/json'}}),
         signal: AbortSignal.timeout(25000)
       });
-      if(!r.ok) throw new Error('HTTP '+r.status);
+      if(!r.ok){
+        let msg = 'HTTP '+r.status;
+        try{ const j = await r.json(); msg += ': '+((j.error&&j.error.message)||'').slice(0,100); }catch(_){}
+        throw new Error(msg);
+      }
       const d = await r.json();
+      localStorage.setItem('qlt-gem-model', m); // nhớ model chạy được
       return d.candidates[0].content.parts[0].text;
-    }catch(e){ lastE=e; }
+    }catch(e){ lastE = e; }
   }
   throw lastE;
+}
+async function testGem(){
+  if(!gemKey()){ gemStatus('⚠️ Dán key rồi bấm Bật AI trước ạ.'); return; }
+  gemStatus('Đang kiểm tra kết nối AI...');
+  try{
+    const out = await askGemini('Trả về đúng JSON: {"action":"answer","params":{},"say":"Em kết nối thành công rồi ạ!"}');
+    const obj = JSON.parse(out.match(/\{[\s\S]*\}/)[0]);
+    gemStatus('✅ AI hoạt động (model: '+(localStorage.getItem('qlt-gem-model')||'?')+'). Bé nói: '+obj.say);
+    speak(obj.say);
+  }catch(e){ gemStatus('❌ Lỗi: '+(e&&e.message||e)+'\nKiểm tra key tại aistudio.google.com (key phải thuộc dự án có bật Generative Language API).'); }
 }
 const AI_SYS = `Bạn là "bé trợ lý" trong app quản lý tài chính cá nhân của sếp Long. Tính cách: dễ thương, lễ phép, xưng "em" gọi "sếp", câu ngắn gọn.
 Phân tích câu sếp nói và trả về DUY NHẤT một JSON (không markdown):
@@ -1824,7 +1889,8 @@ async function aiHandle(text){
     tx: S.tx.slice(-150).map(x=>({d:x.date, t:x.type, a:x.amount, c:x.category, n:x.note||''}))
   };
   let prompt = AI_SYS + '\nDATA:' + JSON.stringify(ctx);
-  if(aiLast) prompt += `\n(Lượt trước sếp nói: "${aiLast.u}" — em đã đáp: "${aiLast.s}")`;
+  const hist = chatHist.slice(-8).map(m=>(m.r==='u'?'Sếp: ':'Em: ')+m.t.replace(/<[^>]+>/g,''));
+  if(hist.length) prompt += '\nHội thoại gần đây:\n'+hist.join('\n');
   prompt += `\nSếp vừa nói: "${text}"`;
   const out = await askGemini(prompt);
   let obj;
@@ -1874,7 +1940,7 @@ async function handleVoice(text){
   if(gemKey() && !pendingVoice){
     toast('🤖 <i>Bé đang suy nghĩ...</i>', 4000);
     try{ await aiHandle(text); return; }
-    catch(e){ toast('⚠️ AI lỗi ('+(e&&e.message||e)+') — dùng bộ luật cơ bản.', 3000); }
+    catch(e){ toast('🤖 Hic, não AI đang lỗi ('+String(e&&e.message||e).slice(0,90)+') — em tạm dùng bộ luật cơ bản ạ. Sếp vào Cài đặt bấm "🔎 Kiểm tra AI" xem chi tiết nha.', 6000); }
   }
   handleVoiceRules(text);
 }
@@ -2123,7 +2189,7 @@ function startVoice(){
     if(e.error==='not-allowed') toast('⚠️ Hãy bấm Cho phép (Allow) khi trình duyệt hỏi quyền micro.', 5000);
     else if(e.error!=='aborted') toast('⚠️ Không nghe rõ, bấm 🎤 thử lại nhé.');
   };
-  recog.onresult = e=>{ done(); handleVoice(e.results[0][0].transcript); };
+  recog.onresult = e=>{ done(); const said = e.results[0][0].transcript; chatPush('u', '🎤 '+escapeHtml(said)); handleVoice(said); };
   recog.start();
 }
 
