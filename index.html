@@ -127,7 +127,7 @@
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer;box-shadow:0 2px 8px rgba(56,189,248,.5)}
   input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer}
   #voice-btn{position:relative}
-  #voice-btn.listening, #chat-mic.listening{box-shadow:0 0 0 4px rgba(244,63,94,.65), 0 8px 26px rgba(244,63,94,.5);animation:nghe 1s ease-in-out infinite;background:rgba(244,63,94,.2)}
+  #voice-btn.listening{box-shadow:0 0 0 4px rgba(244,63,94,.65), 0 8px 26px rgba(244,63,94,.5);animation:nghe 1s ease-in-out infinite}
   @keyframes nghe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
 </style>
 </head>
@@ -430,7 +430,6 @@
   </div>
   <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px"></div>
   <div style="display:flex;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--border)">
-    <button class="ghost" id="chat-mic" style="width:48px;padding:0;font-size:18px" onclick="startVoice()">🎤</button>
     <input id="chat-input" placeholder="Nhắn cho bé trợ lý hoặc ra lệnh..." style="flex:1" onkeydown="if(event.key==='Enter')sendChat()">
     <button onclick="sendChat()" style="width:64px;padding:0">Gửi</button>
   </div>
@@ -611,11 +610,7 @@ function customVND(){
   const r = S.prices.usdtVND || S.prices.fx || 0;
   return (S.custom||[]).reduce((a,c)=> a + (c.qty||0)*(c.price||0)*r, 0);
 }
-function investTotal(){
-  const P = S.prices;
-  return (S.qty.e1||0)*(P.e1||0) + (S.qty.voo||0)*(P.vooUSD||0)*(P.fx||0)
-       + (S.qty.usdt||0)*(P.usdtVND||0) + (S.qty.usdc||0)*(P.usdcVND||0) + customVND();
-}
+function investTotal(){ return customVND(); }
 async function fetchYahooPrice(sym){
   for(const host of ['query1','query2']){
     try{
@@ -725,29 +720,6 @@ async function getFX(){
   const d = await fetchWithProxies('https://open.er-api.com/v6/latest/USD');
   if(d && d.rates && d.rates.VND) return d.rates.VND;
   throw new Error('no VND rate');
-}
-async function getVOO(){
-  const d = await fetchWithProxies('https://query1.finance.yahoo.com/v8/finance/chart/VOO?interval=1d&range=1d');
-  const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
-  if(p) return p;
-  throw new Error('no VOO price');
-}
-async function getE1(){
-  // Nguồn 1: VNDirect dchart (dạng TradingView)
-  try{
-    const to = Math.floor(Date.now()/1000), from = to - 86400*10;
-    const d = await fetchWithProxies(`https://dchart-api.vndirect.com.vn/dchart/history?symbol=E1VFVN30&resolution=D&from=${from}&to=${to}`);
-    if(d && d.c && d.c.length){
-      let p = d.c[d.c.length-1];
-      if(p < 1000) p = p*1000; // API trả theo nghìn đồng
-      return p;
-    }
-  }catch(e){}
-  // Nguồn 2: VNDirect finfo
-  const d2 = await fetchWithProxies('https://finfo-api.vndirect.com.vn/v4/stock_prices?sort=date&q=code:E1VFVN30&size=1');
-  let p2 = d2?.data?.[0]?.close ?? d2?.data?.[0]?.adClose;
-  if(p2){ if(p2 < 1000) p2 = p2*1000; return p2; }
-  throw new Error('no E1 price');
 }
 async function getCrypto(){
   // Nguồn 1: CoinGecko trả thẳng VND
@@ -969,7 +941,7 @@ function renderAllocation(spend, invest){
           msgs.push(`Tiền chi tiêu hiện có (${fmt(spend)}) đủ dùng <b>~${monthsText} tháng</b> — nằm đúng vùng an toàn (3–6 tháng). <b>Lời khuyên: giữ nhịp như hiện tại</b>, có tiền mới thì đem đầu tư.`);
         }else{
           const duRa = spend - avgChi*6;
-          msgs.push(`Tiền chi tiêu hiện có (${fmt(spend)}) đủ dùng <b>~${monthsText} tháng</b> — nhiều hơn mức cần (3–6 tháng). <b>Lời khuyên: có thể chuyển bớt ~${fmt(duRa)} sang đầu tư</b> (E1VFVN30 / VOO) mà vẫn an toàn.`);
+          msgs.push(`Tiền chi tiêu hiện có (${fmt(spend)}) đủ dùng <b>~${monthsText} tháng</b> — nhiều hơn mức cần (3–6 tháng). <b>Lời khuyên: có thể chuyển bớt ~${fmt(duRa)} sang đầu tư</b> để tiền sinh lời.`);
         }
         const thisM = monthChi(ymOffset(0));
         if(thisM > avgChi*1.2 && daysTracked >= 45){
@@ -994,17 +966,6 @@ function renderAllocation(spend, invest){
   document.getElementById('advice').innerHTML = msgs.map(m=>'💡 '+m).join('<br>');
 }
 
-function recordHistory(spend, invest){
-  if(spend+invest<=0) return;
-  S.history = S.history||{};
-  const t = todayStr();
-  const cur = S.history[t];
-  if(cur && typeof cur==='object' && Math.abs(cur.s-spend)<1 && Math.abs(cur.i-invest)<1) return;
-  S.history[t] = {s: Math.round(spend), i: Math.round(invest)};
-  const keys = Object.keys(S.history).sort();
-  if(keys.length>400) for(const k of keys.slice(0, keys.length-400)) delete S.history[k];
-  save();
-}
 
 let histRange = 30, chartPts = [], chartKeys = [], chartVals = [];
 function fmtShort(n){
@@ -1174,7 +1135,6 @@ function render(){
     `Tỷ giá USD/VND: ${P.fx ? fmtN(Math.round(P.fx)) : '—'}` + (P.updated ? ` · Giá cập nhật ${timeAgo(P.updated)}` : '');
 
   renderAllocation(spend, invest);
-  if(P.updated) recordHistory(spend, invest); // chỉ ghi lịch sử khi đã có giá
   renderHistory();
   renderTokens();
   renderNotes();
@@ -1719,8 +1679,6 @@ if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = 
 // âm lượng trợ lý: thanh trượt 0-100%
 let voiceVol = parseFloat(localStorage.getItem('qlt-voice-vol') ?? '1');
 function updateVolBtn(){
-  const b = document.getElementById('vol-btn');
-  if(b) b.textContent = voiceVol<=0 ? '🔇' : voiceVol<0.6 ? '🔉' : '🔊';
   const s = document.getElementById('vol-slider'), v = document.getElementById('vol-val');
   if(s) s.value = Math.round(voiceVol*100);
   if(v) v.textContent = Math.round(voiceVol*100)+'%';
@@ -2383,46 +2341,69 @@ function handleVoiceRules(text){
   }
   fillExpense(amount, gcat, source, date, note);
 }
-let voiceHeard = '';
+let voiceSession = 0, voiceSafety = null;
 function setBanner(txt){
   const b = document.getElementById('rec-banner');
   if(b) b.innerHTML = '<span class="rec-dot"></span> '+txt;
+}
+function voiceReset(){
+  listening = false;
+  const btn = document.getElementById('voice-btn'); if(btn) btn.classList.remove('listening');
+  const banner = document.getElementById('rec-banner'); if(banner) banner.style.display='none';
+  clearTimeout(voiceSafety);
+  if(recog){ try{ recog.onresult=recog.onend=recog.onerror=recog.onstart=null; recog.abort(); }catch(e){} recog=null; }
 }
 function startVoice(){
   unlockAudio(); // mở khóa loa iOS ngay từ cú chạm nút mic
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR){ toast('⚠️ Trình duyệt này chưa hỗ trợ giọng nói. Hãy dùng <b>Safari/Chrome</b> mới nhất.', 5000); return; }
-  if(listening){ try{ recog.stop(); }catch(e){} return; }
-  voiceHeard = '';
-  recog = new SR();
-  recog.lang = 'vi-VN'; recog.interimResults = true; recog.continuous = false; recog.maxAlternatives = 1;
+  if(listening){ voiceReset(); return; } // đang nghe mà bấm lại -> tắt
+
+  voiceReset();               // dọn sạch phiên cũ trước khi mở phiên mới (chống lỗi lần 3)
+  const my = ++voiceSession;  // mã phiên: bỏ qua mọi sự kiện của phiên cũ đến muộn
+  let heard = '', handled = false;
   const btn = document.getElementById('voice-btn');
-  const cmic = document.getElementById('chat-mic');
   const banner = document.getElementById('rec-banner');
-  const done = ()=>{ listening=false; btn.classList.remove('listening'); if(cmic) cmic.classList.remove('listening'); if(banner) banner.style.display='none'; };
-  recog.onstart = ()=>{ listening=true; btn.classList.add('listening'); if(cmic) cmic.classList.add('listening'); if(banner) banner.style.display='flex'; setBanner('Đang nghe... nói đi sếp ơi'); };
-  recog.onaudiostart = ()=> setBanner('🎙️ Micro đã bật, sếp nói đi ạ');
-  recog.onspeechstart = ()=> setBanner('👂 Đang nghe sếp nói...');
-  recog.onresult = e=>{
-    let txt = '';
-    for(let i=0;i<e.results.length;i++) txt += e.results[i][0].transcript;
-    voiceHeard = txt;
-    setBanner('“'+escapeHtml(txt)+'”'); // hiện chữ ngay khi nghe được -> có tín hiệu
-    if(e.results[e.results.length-1].isFinal){
-      done();
-      if(voiceHeard.trim()){ chatPush('u', '🎤 '+escapeHtml(voiceHeard.trim())); handleVoice(voiceHeard.trim()); }
-    }
+
+  const r = new SR();
+  recog = r;
+  r.lang = 'vi-VN'; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+
+  const finish = ()=>{
+    if(my !== voiceSession || handled) return;
+    handled = true;
+    listening = false;
+    if(btn) btn.classList.remove('listening');
+    if(banner) banner.style.display='none';
+    clearTimeout(voiceSafety);
+    const said = heard.trim();
+    if(recog===r) recog = null;
+    if(said){ chatPush('u', '🎤 '+escapeHtml(said)); handleVoice(said); }
   };
-  recog.onerror = e=>{ done();
+
+  r.onstart = ()=>{ if(my!==voiceSession) return; listening=true; if(btn) btn.classList.add('listening'); if(banner) banner.style.display='flex'; setBanner('Đang nghe... nói đi sếp ơi'); };
+  r.onaudiostart = ()=>{ if(my===voiceSession) setBanner('🎙️ Micro đã bật, sếp nói đi ạ'); };
+  r.onspeechstart = ()=>{ if(my===voiceSession) setBanner('👂 Đang nghe sếp nói...'); };
+  r.onresult = e=>{
+    if(my!==voiceSession) return;
+    heard = '';
+    for(let i=0;i<e.results.length;i++) heard += e.results[i][0].transcript;
+    setBanner('“'+escapeHtml(heard)+'”');
+    if(e.results[e.results.length-1].isFinal) finish();
+  };
+  r.onerror = e=>{
+    if(my!==voiceSession) return;
     if(e.error==='not-allowed'||e.error==='service-not-allowed') toast('⚠️ Bấm Cho phép (Allow) khi hỏi quyền micro. iPhone: Cài đặt → Safari → Micro → Cho phép.', 6000);
     else if(e.error==='no-speech') toast('🤖 Em chưa nghe thấy gì ạ, sếp bấm 🎤 nói to hơn chút nha.', 4000);
     else if(e.error!=='aborted') toast('⚠️ Micro trục trặc ('+e.error+'), sếp thử lại nhé.', 4000);
+    voiceReset();
   };
-  recog.onend = ()=>{
-    // iOS đôi khi kết thúc mà không có isFinal -> vẫn xử lý câu đã nghe được
-    if(listening){ done(); if(voiceHeard.trim()){ chatPush('u', '🎤 '+escapeHtml(voiceHeard.trim())); handleVoice(voiceHeard.trim()); } }
-  };
-  try{ recog.start(); }catch(e){ done(); toast('⚠️ Không mở được micro, sếp thử lại sau 1 giây nhé.'); }
+  r.onend = ()=>{ if(my===voiceSession) finish(); }; // iOS kết thúc không báo isFinal -> vẫn xử lý câu đã nghe
+
+  try{ r.start(); }
+  catch(e){ voiceReset(); toast('⚠️ Micro đang bận, sếp bấm lại lần nữa nhé.'); return; }
+  // an toàn: nếu 15s không có sự kiện nào -> tự reset để lần sau bấm được
+  voiceSafety = setTimeout(()=>{ if(my===voiceSession && !handled){ voiceReset(); } }, 15000);
 }
 
 /* ================= ĐIỀU HƯỚNG ================= */
