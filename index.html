@@ -434,8 +434,8 @@
     <button onclick="sendChat()" style="width:64px;padding:0">Gửi</button>
   </div>
 </div>
-<div id="rec-banner" style="position:fixed;left:50%;bottom:calc(152px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:95;display:none;align-items:center;gap:9px;background:rgba(244,63,94,.18);border:1px solid rgba(244,63,94,.55);color:#fecdd3;border-radius:20px;padding:9px 18px;font-size:13px;font-weight:700;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)">
-  <span class="rec-dot"></span> Đang ghi âm... nói xong tự gửi
+<div id="rec-banner" style="position:fixed;left:50%;bottom:calc(152px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:95;display:none;align-items:center;gap:9px;max-width:88%;text-align:center;background:rgba(244,63,94,.18);border:1px solid rgba(244,63,94,.55);color:#fecdd3;border-radius:20px;padding:9px 18px;font-size:13px;font-weight:700;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)">
+  <span class="rec-dot"></span> Đang ghi âm...
 </div>
 <button id="chat-btn" class="ghost" onclick="toggleChat()" title="Chat với bé trợ lý"
   style="position:fixed;right:23px;bottom:calc(156px + env(safe-area-inset-bottom));width:44px;height:44px;border-radius:50%;font-size:18px;z-index:60;padding:0">💬</button>
@@ -1760,18 +1760,21 @@ function elClear(){
   document.getElementById('el-status').textContent = 'Đã tắt giọng AI, quay về giọng máy.';
 }
 async function speakEleven(text){
-  const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/'+elVoiceId()+'?output_format=mp3_44100_64', {
-    method: 'POST',
-    headers: {'xi-api-key': elKey(), 'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      text,
-      model_id: 'eleven_turbo_v2_5', // hỗ trợ tiếng Việt chuẩn + tốn 1 nửa credits
-      voice_settings: {stability: 0.45, similarity_boost: 0.8, style: 0.3}
-    }),
-    signal: AbortSignal.timeout(20000)
-  });
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  const blob = await r.blob();
+  const models = ['eleven_turbo_v2_5','eleven_multilingual_v2','eleven_flash_v2_5'];
+  let lastE, blob;
+  for(const mdl of models){
+    try{
+      const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/'+elVoiceId()+'?output_format=mp3_44100_64', {
+        method: 'POST',
+        headers: {'xi-api-key': elKey(), 'Content-Type': 'application/json'},
+        body: JSON.stringify({ text, model_id: mdl, voice_settings: {stability: 0.45, similarity_boost: 0.8, style: 0.3} }),
+        signal: AbortSignal.timeout(20000)
+      });
+      if(!r.ok){ let msg='HTTP '+r.status; try{const j=await r.json();msg+=' '+((j.detail&&(j.detail.message||j.detail.status))||'');}catch(_){} lastE=new Error(msg); continue; }
+      blob = await r.blob(); break;
+    }catch(e){ lastE=e; }
+  }
+  if(!blob) throw lastE || new Error('ElevenLabs lỗi');
   if(!elAudio) unlockAudio();
   try{ elAudio.pause(); }catch(e){}
   elAudio.src = URL.createObjectURL(blob); // dùng lại "loa" đã mở khóa -> iOS cho phát
@@ -1799,7 +1802,10 @@ function speak(text){
     speakEleven(s).catch(e=>{
       speakLocal(s); // lỗi mạng/hết hạn mức -> giọng máy
       const st = document.getElementById('el-status');
-      if(st) st.textContent = '⚠️ Giọng AI lỗi ('+(e&&e.message||e)+') — tạm dùng giọng máy.';
+      const emsg = String(e&&e.message||e);
+      if(st) st.textContent = '⚠️ Giọng AI lỗi ('+emsg+') — tạm dùng giọng máy.';
+      // hiện lỗi 1 lần để sếp biết (hết credits / model không hợp lệ / bị chặn)
+      if(!window._elWarned){ window._elWarned=true; toast('⚠️ Giọng AI ElevenLabs lỗi: '+emsg+'. Em tạm dùng giọng máy. Kiểm tra ở Cài đặt → Giọng bé trợ lý nha.', 7000); }
     });
   }else{
     speakLocal(s);
@@ -2042,10 +2048,13 @@ async function aiHandle(text){
   if(hist.length) prompt += '\nHội thoại gần đây:\n'+hist.join('\n');
   prompt += `\nSếp vừa nói: "${text}"`;
   const out = await askGemini(prompt);
-  const obj = parseAIOut(out);
+  aiLast = {u:text, s:''};
+  dispatchAI(parseAIOut(out));
+}
+function dispatchAI(obj){
   const p = obj.params || {};
   const say = obj.say || 'Dạ xong rồi ạ!';
-  aiLast = {u:text, s:say};
+  if(aiLast) aiLast.s = say;
   const date = p.date || todayStr();
   switch(obj.action){
     case 'expense': fillExpense(p.amount, S.categories.includes(p.category)?p.category:(guessCategory(p.category||'')||'Khác'), resolveWalletId(p.source), date, p.note||''); break;
@@ -2353,8 +2362,82 @@ function voiceReset(){
   clearTimeout(voiceSafety);
   if(recog){ try{ recog.onresult=recog.onend=recog.onerror=recog.onstart=null; recog.abort(); }catch(e){} recog=null; }
 }
+/* ===== THU ÂM -> GEMINI NGHE (ổn định trên iOS, chính xác tiếng Việt) ===== */
+let recStream=null, recCtx=null, recNode=null, recData=[], recSR=44100, recActive=false, recStop=null;
+function encodeWAV(samples, sr){
+  const buf = new ArrayBuffer(44 + samples.length*2), v = new DataView(buf);
+  const wr = (o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  wr(0,'RIFF'); v.setUint32(4, 36+samples.length*2, true); wr(8,'WAVE'); wr(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  wr(36,'data'); v.setUint32(40, samples.length*2, true);
+  let o=44; for(let i=0;i<samples.length;i++){ let s=Math.max(-1,Math.min(1,samples[i])); v.setInt16(o, s<0?s*0x8000:s*0x7FFF, true); o+=2; }
+  return new Blob([buf], {type:'audio/wav'});
+}
+async function startGeminiVoice(){
+  const btn = document.getElementById('voice-btn');
+  const banner = document.getElementById('rec-banner');
+  if(recActive){ if(recStop) recStop(); return; } // đang thu mà bấm lại -> dừng & gửi
+  try{
+    recStream = await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(e){ toast('⚠️ Chưa cho phép micro. iPhone: Cài đặt → Safari → Micro → Cho phép ạ.', 6000); return; }
+  recActive = true; recData = [];
+  if(btn) btn.classList.add('listening');
+  if(banner){ banner.style.display='flex'; }
+  setBanner('🎙️ Đang ghi âm... bấm 🎤 lần nữa khi nói xong');
+  recCtx = new (window.AudioContext||window.webkitAudioContext)();
+  recSR = recCtx.sampleRate;
+  const src = recCtx.createMediaStreamSource(recStream);
+  recNode = recCtx.createScriptProcessor(4096, 1, 1);
+  recNode.onaudioprocess = e=>{ if(recActive) recData.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+  src.connect(recNode); recNode.connect(recCtx.destination);
+  // tự dừng sau 15s cho an toàn
+  const auto = setTimeout(()=>{ if(recStop) recStop(); }, 15000);
+  recStop = async ()=>{
+    if(!recActive) return; recActive=false; recStop=null; clearTimeout(auto);
+    if(btn) btn.classList.remove('listening');
+    setBanner('⏳ Em đang nghe lại...');
+    try{ recNode.disconnect(); src.disconnect(); recStream.getTracks().forEach(t=>t.stop()); await recCtx.close(); }catch(e){}
+    let len=0; recData.forEach(a=>len+=a.length);
+    if(banner) banner.style.display='none';
+    if(len < recSR*0.4){ toast('🤖 Em chưa nghe rõ, sếp bấm 🎤 nói lại giúp em ạ.'); return; }
+    const merged = new Float32Array(len); let off=0; recData.forEach(a=>{ merged.set(a,off); off+=a.length; });
+    const wav = encodeWAV(merged, recSR);
+    const b64 = await new Promise(res=>{ const r=new FileReader(); r.onloadend=()=>res(r.result.split(',')[1]); r.readAsDataURL(wav); });
+    setTyping(true);
+    try{ await aiHandleAudio(b64); }
+    catch(e){ toast('🤖 Hic, em nghe không rõ ('+String(e&&e.message||e).slice(0,60)+'), sếp gõ tin nhắn giúp em nha.', 6000); }
+    setTyping(false);
+  };
+}
+async function aiHandleAudio(b64wav){
+  // Gemini vừa nghe (transcribe) vừa hiểu lệnh trong 1 lượt
+  const m = balances();
+  const ctx = { today: todayStr(), categories: S.categories,
+    wallets: S.wallets.map(w=>({id:w.id, name:w.name, bal:Math.round(m[w.id]||0)})),
+    invest: Math.round(investTotal()),
+    notes: (S.notes||[]).map(n=>({code:n.code, title:n.title})),
+    tx: S.tx.slice(-120).map(x=>({d:x.date, t:x.type, a:x.amount, c:x.category})) };
+  const prompt = AI_SYS + '\nDATA:' + JSON.stringify(ctx) +
+    '\nĐây là đoạn ghi âm sếp vừa nói (tiếng Việt). Hãy nghe, hiểu ý và trả về JSON như quy định. Thêm trường "heard" = nguyên văn câu sếp nói.';
+  const model = localStorage.getItem('qlt-gem-model') || (await discoverGemModels())[0];
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gemKey()}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ contents:[{parts:[ {text:prompt}, {inline_data:{mime_type:'audio/wav', data:b64wav}} ]}],
+      generationConfig:{temperature:0.3, response_mime_type:'application/json'} }),
+    signal: AbortSignal.timeout(30000)
+  });
+  if(!r.ok){ let msg='HTTP '+r.status; try{const j=await r.json();msg+=': '+((j.error&&j.error.message)||'').slice(0,80);}catch(_){}
+    if(r.status===404){ localStorage.removeItem('qlt-gem-model'); } throw new Error(msg); }
+  const d = await r.json();
+  const obj = parseAIOut(d.candidates[0].content.parts[0].text);
+  if(obj.params && obj.params.heard) chatPush('u', '🎤 '+escapeHtml(obj.params.heard));
+  else if(obj.heard) chatPush('u', '🎤 '+escapeHtml(obj.heard));
+  dispatchAI(obj);
+}
 function startVoice(){
   unlockAudio(); // mở khóa loa iOS ngay từ cú chạm nút mic
+  if(gemKey()){ startGeminiVoice(); return; } // có Gemini -> thu âm gửi Gemini (ổn định iOS)
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR){ toast('⚠️ Trình duyệt này chưa hỗ trợ giọng nói. Hãy dùng <b>Safari/Chrome</b> mới nhất.', 5000); return; }
   if(listening){ voiceReset(); return; } // đang nghe mà bấm lại -> tắt
