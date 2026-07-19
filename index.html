@@ -1293,7 +1293,21 @@ function renderReport(){
       <div style="display:flex;justify-content:space-between;font-size:13px"><span>${c}</span><b>${fmt(v)} <span class="muted">(${out?Math.round(v/out*100):0}%)</span></b></div>
       <div class="bar-wrap"><div class="bar" style="width:${out?Math.round(v/out*100):0}%"></div></div>
     </div>`).join('') : '<div class="muted" style="font-size:13px">Chưa có khoản chi trong tháng này.</div>';
-  document.getElementById('rp-list').innerHTML = list.length ? list.map(txRow).join('') : '<div class="muted" style="font-size:13px">Không có giao dịch.</div>';
+  rpList = list; rpShown = 10;
+  paintRpList();
+}
+let rpList = [], rpShown = 10;
+function paintRpList(){
+  const el = document.getElementById('rp-list');
+  if(!rpList.length){ el.innerHTML = '<div class="muted" style="font-size:13px">Không có giao dịch.</div>'; return; }
+  const shown = rpList.slice(0, rpShown);
+  let html = shown.map(txRow).join('');
+  if(rpList.length > rpShown){
+    html += `<button class="ghost small" onclick="rpShown+=20;paintRpList()" style="width:100%;margin-top:8px">Xem thêm ${Math.min(20, rpList.length-rpShown)} giao dịch (còn ${rpList.length-rpShown})</button>`;
+  }else if(rpList.length > 10){
+    html += `<button class="ghost small" onclick="rpShown=10;paintRpList()" style="width:100%;margin-top:8px">Thu gọn ▲</button>`;
+  }
+  el.innerHTML = html;
 }
 function runFilter(speakOut=false){
   const from = document.getElementById('flt-from').value;
