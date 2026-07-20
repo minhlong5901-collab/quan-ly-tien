@@ -305,6 +305,8 @@
       </div>
       <label>Danh mục</label>
       <select id="flt-cat"><option value="">Tất cả danh mục</option></select>
+      <label>Tìm theo ghi chú</label>
+      <input type="text" id="flt-note" placeholder="VD: trà sữa ngô gia" onkeydown="if(event.key==='Enter')runFilter()">
       <div style="margin-top:12px"><button onclick="runFilter()" style="width:100%">Lọc chi tiêu</button></div>
       <div id="flt-result" style="margin-top:10px"></div>
     </div>
@@ -524,9 +526,9 @@ function load(){
     localStorage.setItem('qlt-data', JSON.stringify(S));
   }
   if((S.qty.e1||0)>0){ S.qty.e1 = 0; localStorage.setItem('qlt-data', JSON.stringify(S)); } // đã bỏ theo dõi VN30
-  // dọn ảnh chụp đầu tư cũ (còn dính VN30 đã gỡ) để biến động không bị lệch ảo — chạy 1 lần
+  // biểu đồ giờ dựng từ giao dịch -> xóa hẳn dữ liệu "ảnh chụp" đời cũ (chạy 1 lần)
   if(!S.histV2){
-    S.history = {};
+    delete S.history;
     S.histV2 = true;
     localStorage.setItem('qlt-data', JSON.stringify(S));
   }
@@ -1309,14 +1311,18 @@ function paintRpList(){
   }
   el.innerHTML = html;
 }
+let fltList = [], fltShown = 10, fltHead = '';
 function runFilter(speakOut=false){
   const from = document.getElementById('flt-from').value;
   const to = document.getElementById('flt-to').value;
   const cat = document.getElementById('flt-cat').value;
+  const q = stripVN((document.getElementById('flt-note').value||'').trim());
   const el = document.getElementById('flt-result');
   if(!from || !to){ toast('Sếp chọn đủ "Từ ngày" và "Đến ngày" nha!'); return; }
   if(from > to){ toast('"Từ ngày" phải trước "Đến ngày" nha sếp!'); return; }
-  const list = S.tx.filter(x=>x.type==='chi' && x.date>=from && x.date<=to && (!cat || x.category===cat))
+  const list = S.tx.filter(x=> x.type==='chi' && x.date>=from && x.date<=to
+                   && (!cat || x.category===cat)
+                   && (!q || stripVN((x.note||'')+' '+(x.category||'')).includes(q)))
                    .sort((a,b)=> b.date.localeCompare(a.date) || b.id-a.id);
   const total = list.reduce((a,x)=>a+x.amount,0);
   const dd = d=>d.slice(8,10)+'/'+d.slice(5,7);
@@ -1329,16 +1335,32 @@ function runFilter(speakOut=false){
         `<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>${c}</span><b>${fmt(v)}</b></div>`).join('')
       + '</div>';
   }
-  el.innerHTML = `
+  const qLabel = q ? ' · 🔍 "'+escapeHtml(document.getElementById('flt-note').value.trim())+'"' : '';
+  fltHead = `
     <div style="background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px">
-      <div class="detail muted">${dd(from)} → ${dd(to)}${cat ? ' · '+cat : ' · tất cả danh mục'} · ${list.length} giao dịch</div>
+      <div class="detail muted">${dd(from)} → ${dd(to)}${cat ? ' · '+cat : ' · tất cả danh mục'}${qLabel} · ${list.length} giao dịch</div>
       <div style="font-size:22px;font-weight:800" class="red">${fmt(total)}</div>
       ${breakdown}
-    </div>` + (list.length ? list.map(txRow).join('') : '<div class="muted" style="font-size:13px;margin-top:8px">Không có khoản chi nào trong khoảng này.</div>');
+    </div>`;
+  fltList = list; fltShown = 10;
+  paintFltList();
   if(speakOut){
-    speak(cat ? `Dạ, từ ${dd(from)} đến ${dd(to)}, sếp đã chi ${fmt(total)} cho ${cat} ạ`
-              : `Dạ, từ ${dd(from)} đến ${dd(to)}, sếp đã chi tổng cộng ${fmt(total)} ạ`);
+    const what = q ? `có ghi chú ${document.getElementById('flt-note').value.trim()}` : (cat ? `cho ${cat}` : 'tổng cộng');
+    speak(list.length
+      ? `Dạ, từ ${dd(from)} đến ${dd(to)}, sếp đã chi ${what} ${fmt(total)}, gồm ${list.length} khoản ạ`
+      : `Dạ, em không tìm thấy khoản chi nào ${what} trong khoảng này ạ`);
   }
+}
+function paintFltList(){
+  const el = document.getElementById('flt-result');
+  if(!fltList.length){ el.innerHTML = fltHead + '<div class="muted" style="font-size:13px;margin-top:8px">Không tìm thấy khoản chi nào khớp.</div>'; return; }
+  let html = fltHead + fltList.slice(0, fltShown).map(txRow).join('');
+  if(fltList.length > fltShown){
+    html += `<button class="ghost small" onclick="fltShown+=20;paintFltList()" style="width:100%;margin-top:8px">Xem thêm ${Math.min(20, fltList.length-fltShown)} giao dịch (còn ${fltList.length-fltShown})</button>`;
+  }else if(fltList.length > 10){
+    html += `<button class="ghost small" onclick="fltShown=10;paintFltList()" style="width:100%;margin-top:8px">Thu gọn ▲</button>`;
+  }
+  el.innerHTML = html;
 }
 
 /* ================= CÀI ĐẶT ================= */
@@ -2022,7 +2044,7 @@ Action hợp lệ (source/from/to = "id" của ví trong DATA.wallets, chọn th
 - "income" khoản thu: {amount, source, note}
 - "atm" chuyển tiền giữa 2 ví: {from, to, amount, date, note}
 - "transfer" chuyển với Binance: {direction:"toBinance"|"fromBinance", amount:VND, source, date, rate:giá USDT hoặc 0, note}
-- "filter" lọc chi tiêu: {from:"YYYY-MM-DD", to:"YYYY-MM-DD", category:""|tên danh mục}
+- "filter" lọc/tìm chi tiêu: {from:"YYYY-MM-DD", to:"YYYY-MM-DD", category:""|tên danh mục, note:"từ khóa ghi chú cần tìm, VD: trà sữa ngô gia"}
 - "report": {month:"YYYY-MM"} | "navigate": {target:"tongquan"|"chitieu"|"biendong"|"caidat"}
 - "note_new" tạo ghi chú mới: {title, body:"nội dung, xuống dòng bằng \\n"}
 - "note_edit" sửa ghi chú theo MÃ trong DATA.notes (chỉ sửa đúng mã sếp nêu): {code:"N1", title:"" nếu đổi tiêu đề, append:"văn bản nối vào cuối" HOẶC replace:"toàn bộ nội dung mới"} — app mở bản nháp cho sếp bấm Lưu xác nhận.
@@ -2081,6 +2103,7 @@ function dispatchAI(obj){
       document.getElementById('flt-to').value = p.to || todayStr();
       renderCatList();
       document.getElementById('flt-cat').value = S.categories.includes(p.category)?p.category:'';
+      document.getElementById('flt-note').value = p.note || '';
       runFilter(false); toast('🤖 '+say, 7000); speak(say);
       setTimeout(()=>document.getElementById('flt-result').scrollIntoView({behavior:'smooth', block:'center'}), 300);
       break;
@@ -2242,6 +2265,21 @@ function handleVoiceRules(text){
   if(/sao luu/.test(t)){ goTab('settings'); cloudBackup(true); return; }
   if(/(tai|lay|keo) du lieu/.test(t)){ goTab('settings'); cloudDownload(true); return; }
   // BỘ LỌC bằng giọng nói: "lọc ăn uống từ ngày 1 đến ngày 15", "lọc chi tiêu tháng này"
+  // "tìm trà sữa ngô gia" / "tìm ghi chú ..." -> tìm theo ghi chú trong 12 tháng gần đây
+  const mFind = text.match(/(?:tim|tìm|search)\s+(?:ghi chú\s+|ghi chu\s+)?(.{2,60})$/i);
+  if(mFind && !/bao nhieu/.test(t)){
+    const kw = mFind[1].trim();
+    const d1 = new Date(todayStr()); d1.setMonth(d1.getMonth()-12);
+    goTab('report');
+    document.getElementById('flt-from').value = d1.toISOString().slice(0,10);
+    document.getElementById('flt-to').value = todayStr();
+    renderCatList();
+    document.getElementById('flt-cat').value = '';
+    document.getElementById('flt-note').value = kw;
+    runFilter(true);
+    setTimeout(()=>document.getElementById('flt-result').scrollIntoView({behavior:'smooth', block:'center'}), 300);
+    return;
+  }
   if(t.includes('loc') && (/tu ngay|den ngay|toi ngay|thang nay|thang \d/.test(t) || S.categories.some(c=>t.includes(stripVN(c))))){
     const ym = todayStr().slice(0,7);
     const pd = m => {
